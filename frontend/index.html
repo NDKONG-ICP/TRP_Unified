@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/jpeg" href="/src/trplogo.jpg" />
+    <link rel="apple-touch-icon" href="/src/trplogo.jpg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover" />
+    <meta name="description" content="The Raven Project - Multi-chain AI Agent NFT ecosystem with persistent memory. AXIOM Collection, RavenAI agents, and more. Built on Internet Computer." />
+    <meta name="theme-color" content="#d97706" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="RavenAI" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="application-name" content="The Raven Project" />
+    <meta name="msapplication-TileColor" content="#d97706" />
+    <meta name="msapplication-config" content="/browserconfig.xml" />
+    
+    <!-- Open Graph / Social Media -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://ravenproject.io/" />
+    <meta property="og:title" content="The Raven Project | Multi-Chain AI Agent NFTs" />
+    <meta property="og:description" content="Own your personalized on-chain AI agent with persistent memory. AXIOM Collection - 300 exclusive NFTs." />
+    <meta property="og:image" content="/src/trpbanner.jpg" />
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content="https://ravenproject.io/" />
+    <meta property="twitter:title" content="The Raven Project | Multi-Chain AI Agent NFTs" />
+    <meta property="twitter:description" content="Own your personalized on-chain AI agent with persistent memory. AXIOM Collection - 300 exclusive NFTs." />
+    <meta property="twitter:image" content="/src/trpbanner.jpg" />
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <title>The Raven Project | Multi-Chain AI Agent NFTs</title>
+    
+    <!-- Register Service Worker -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then(() => {
+              // Service worker registered successfully
+            })
+            .catch(() => {
+              // Service worker registration failed
+            });
+        });
+      }
+    </script>
+  </head>
+  <body class="bg-raven-black text-white antialiased">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    
+    <!-- No-JS Fallback -->
+    <noscript>
+      <div style="padding: 2rem; text-align: center; background: #0a0a0a; color: #fff; min-height: 100vh;">
+        <h1 style="color: #d97706;">The Raven Project</h1>
+        <p>Please enable JavaScript to use this application.</p>
+      </div>
+    </noscript>
+  </body>
+</html>

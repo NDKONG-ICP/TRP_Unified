@@ -1,0 +1,48 @@
+type SIWEMessage = record {
+  domain: text;
+  address: text;
+  statement: opt text;
+  uri: text;
+  version: text;
+  chain_id: nat;
+  nonce: text;
+  issued_at: text;
+  expiration_time: opt text;
+  not_before: opt text;
+  request_id: opt text;
+  resources: opt vec text;
+};
+
+type SIWESession = record {
+  session_id: text;
+  eth_address: text;
+  principal: principal;
+  created_at: nat64;
+  expires_at: nat64;
+};
+
+type VerifyResult = variant {
+  Ok: SIWESession;
+  Err: text;
+};
+
+service : {
+  // Verify SIWE message and signature
+  verify_siwe: (SIWEMessage, text) -> (VerifyResult);
+  
+  // Get session by ID
+  get_session: (text) -> (opt SIWESession) query;
+  
+  // Get principal by Ethereum address
+  get_principal_by_address: (text) -> (opt principal) query;
+  
+  // Get Ethereum address by principal
+  get_address_by_principal: (principal) -> (opt text) query;
+  
+  // Revoke session
+  revoke_session: (text) -> (bool);
+  
+  // Cleanup expired sessions
+  cleanup_sessions: () -> (nat);
+};
+

@@ -1,0 +1,197 @@
+type MultichainMetadata = record {
+    // Internet Computer (Primary)
+    icp_canister : text;
+    
+    // Ethereum & EVM Chains (ERC-721, ERC-1155, ERC-721A)
+    eth_contract : opt text;          // ERC-721 contract address
+    eth_token_id : opt text;           // ERC-721 token ID
+    evm_chain_id : opt nat64;          // Chain ID (1=Mainnet, 137=Polygon, 56=BNB, etc.)
+    erc1155_contract : opt text;       // ERC-1155 contract address
+    erc1155_token_id : opt text;        // ERC-1155 token ID
+    
+    // Solana (SPL/Metaplex)
+    sol_mint : opt text;               // SPL token mint address
+    sol_edition : opt text;            // Metaplex edition address
+    
+    // Bitcoin (Ordinals, BRC-20, Runes)
+    btc_inscription : opt text;        // Ordinals inscription ID
+    btc_brc20 : opt text;              // BRC-20 token ticker
+    btc_runes : opt text;              // Runes inscription ID
+    
+    // TON (TEP-62, TEP-64)
+    ton_collection : opt text;         // TON collection address
+    ton_item : opt text;               // TON NFT item address
+    
+    // SUI (Origin-Byte Protocol)
+    sui_object_id : opt text;          // SUI object ID
+    sui_package_id : opt text;         // SUI package ID
+    
+    // Standards compliance
+    standards : vec text;              // ["ICRC-7", "ERC-721", "ERC-1155", "SPL", "Metaplex", "Ordinals", "TEP-62", "TEP-64", "Origin-Byte"]
+    
+    // Bridge information (for cross-chain transfers via Chain Fusion)
+    bridge_protocol : opt text;        // Bridge protocol name (e.g., "Chain Fusion", "Omnic", "ckBTC")
+    bridge_address : opt text;         // Bridge contract/canister address
+};
+
+type AxiomMetadata = record {
+    token_id : nat64;
+    name : text;
+    description : text;
+    image_url : text;
+    owner : principal;
+    created_at : nat64;
+    personality : text;
+    specialization : text;
+    total_conversations : nat64;
+    total_messages : nat64;
+    last_active : nat64;
+    multichain_metadata : MultichainMetadata;
+};
+
+type ChatMessage = record {
+    role : text;
+    content : text;
+    timestamp : nat64;
+    voice_url : opt text;
+};
+
+type Conversation = record {
+    id : nat64;
+    user : principal;
+    messages : vec ChatMessage;
+    started_at : nat64;
+    last_message_at : nat64;
+    summary : opt text;
+};
+
+type MemoryEntry = record {
+    key : text;
+    value : text;
+    category : text;
+    importance : nat8;
+    created_at : nat64;
+    last_accessed : nat64;
+    access_count : nat64;
+};
+
+type AxiomConfig = record {
+    voice_enabled : bool;
+    voice_id : text;
+    system_prompt : text;
+    max_memory_entries : nat64;
+    max_conversation_length : nat64;
+    temperature : float64;
+    controllers : vec text;
+};
+
+type ChatResponse = record {
+    message : text;
+    conversation_id : nat64;
+    voice_url : opt text;
+    timestamp : nat64;
+};
+
+type InitArgs = record {
+    token_id : nat64;
+    name : text;
+    description : text;
+    owner : principal;
+    personality : opt text;
+    specialization : opt text;
+};
+
+type ClaimResult = record {
+    success : bool;
+    message : text;
+    new_owner : principal;
+    wallet_type : text;
+};
+
+type OwnershipStatus = record {
+    is_owner : bool;
+    is_controller : bool;
+    owner : principal;
+    caller : principal;
+    token_id : nat64;
+    can_interact : bool;
+};
+
+type WalletSupport = record {
+    wallet_type : text;
+    name : text;
+    supported : bool;
+    claim_method : text;
+    description : text;
+};
+
+// HTTP Request/Response types for serving frontend
+type HttpRequest = record {
+    method : text;
+    url : text;
+    headers : vec record { text; text };
+    body : vec nat8;
+};
+
+type HttpResponse = record {
+    status_code : nat16;
+    headers : vec record { text; text };
+    body : vec nat8;
+};
+
+service : (InitArgs) -> {
+    // Chat functions
+    chat : (text, opt nat64) -> (variant { Ok : ChatResponse; Err : text });
+    
+    // Query functions
+    get_metadata : () -> (AxiomMetadata) query;
+    get_multichain_metadata : () -> (MultichainMetadata) query;
+    get_conversation : (nat64) -> (opt Conversation) query;
+    get_conversations : (principal) -> (vec Conversation) query;
+    get_memories : () -> (vec MemoryEntry) query;
+    get_config : () -> (AxiomConfig) query;
+    
+    // Owner/Controller functions
+    transfer_ownership : (principal) -> (variant { Ok; Err : text });
+    update_token_info : (nat64, opt text) -> (variant { Ok; Err : text });
+    update_config : (opt bool, opt text, opt text, opt float64) -> (variant { Ok; Err : text });
+    // Update multichain metadata for cross-chain NFT support
+    // Supports: ETH/EVM (ERC-721, ERC-1155, ERC-721A), Solana (SPL/Metaplex), 
+    // Bitcoin (Ordinals, BRC-20, Runes), TON (TEP-62, TEP-64), SUI (Origin-Byte)
+    // Reference: https://github.com/dfinity/awesome-internet-computer#chain-fusion
+    update_multichain_metadata : (
+        opt text,    // eth_contract
+        opt text,    // eth_token_id
+        opt nat64,   // evm_chain_id
+        opt text,    // erc1155_contract
+        opt text,    // erc1155_token_id
+        opt text,    // sol_mint
+        opt text,    // sol_edition
+        opt text,    // btc_inscription
+        opt text,    // btc_brc20
+        opt text,    // btc_runes
+        opt text,    // ton_collection
+        opt text,    // ton_item
+        opt text,    // sui_object_id
+        opt text,    // sui_package_id
+        opt text,    // bridge_protocol
+        opt text     // bridge_address
+    ) -> (variant { Ok; Err : text });
+    add_memory : (text, text, text, nat8) -> (variant { Ok; Err : text });
+    clear_memories : () -> (variant { Ok : nat64; Err : text });
+    
+    // Plug & OISY Wallet Integration
+    claim_with_plug : (principal) -> (variant { Ok : ClaimResult; Err : text });
+    claim_with_oisy : (principal) -> (variant { Ok : ClaimResult; Err : text });
+    claim_with_internet_identity : () -> (variant { Ok : ClaimResult; Err : text });
+    verify_ownership : () -> (OwnershipStatus) query;
+    get_supported_wallets : () -> (vec WalletSupport) query;
+    
+    // Health check
+    health : () -> (text) query;
+    
+    // HTTP Request handling for serving frontend
+    http_request : (HttpRequest) -> (HttpResponse) query;
+    http_update : (HttpRequest) -> (HttpResponse);
+}
+

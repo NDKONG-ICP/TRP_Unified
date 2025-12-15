@@ -1,0 +1,29 @@
+type Inscription = record {
+  id: text;
+  content: vec nat8;
+  content_type: text;
+  owner: text;
+  sat: nat64;
+  timestamp: nat64;
+};
+
+type CreateRequest = record {
+  content: vec nat8;
+  content_type: text;
+  fee_rate: opt nat64;
+};
+
+type CreateResult = variant {
+  Ok: record {
+    inscription_id: text;
+    tx_id: text;
+  };
+  Err: text;
+};
+
+service : {
+  create_inscription: (CreateRequest) -> (CreateResult);
+  get_inscription: (text) -> (opt Inscription) query;
+  get_user_inscriptions: (text) -> (vec Inscription) query;
+  transfer_inscription: (text, text) -> (variant { Ok: text; Err: text });
+};

@@ -1,0 +1,225 @@
+type AlternativeRoute = record {
+    name: text;
+    distance_miles: float64;
+    duration_hours: float64;
+    notes: text;
+};
+
+type RouteOptimization = record {
+    origin: text;
+    destination: text;
+    distance_miles: float64;
+    duration_hours: float64;
+    fuel_cost_estimate: float64;
+    toll_cost_estimate: float64;
+    weather_conditions: text;
+    traffic_level: text;
+    recommended_stops: vec text;
+    alternative_routes: vec AlternativeRoute;
+    cached_at: nat64;
+};
+
+type ETAPrediction = record {
+    origin: text;
+    destination: text;
+    current_location: opt text;
+    estimated_arrival: text;
+    confidence: float64;
+    factors: vec text;
+};
+
+type FuelStop = record {
+    location: text;
+    price_per_gallon: float64;
+    distance_from_start: float64;
+};
+
+type FuelOptimization = record {
+    route: text;
+    total_fuel_gallons: float64;
+    estimated_cost: float64;
+    recommended_stops: vec FuelStop;
+    potential_savings: float64;
+};
+
+type AIConfig = record {
+    admin: principal;
+    cache_duration_ns: nat64;
+    max_requests_per_minute: nat32;
+};
+
+// LLM Council Types
+type QueryPriority = variant {
+    Low;
+    Normal;
+    High;
+    Critical;
+};
+
+type LLMResponse = record {
+    provider_id: text;
+    provider_name: text;
+    response: text;
+    tokens_used: nat32;
+    latency_ms: nat64;
+    timestamp: nat64;
+};
+
+type ResponseReview = record {
+    reviewer_id: text;
+    reviewed_response_id: text;
+    accuracy_score: nat8;
+    insight_score: nat8;
+    completeness_score: nat8;
+    overall_rank: nat8;
+    feedback: text;
+};
+
+type CouncilQuery = record {
+    query_id: text;
+    user_query: text;
+    context: opt text;
+    requested_at: nat64;
+    priority: QueryPriority;
+};
+
+type CouncilStage = variant {
+    Pending;
+    CollectingResponses;
+    ReviewingResponses;
+    GeneratingConsensus;
+    Completed;
+    Failed: text;
+};
+
+type LLMProvider = record {
+    id: text;
+    name: text;
+    model: text;
+    api_endpoint: text;
+    max_tokens: nat32;
+    temperature: float32;
+    is_chairman: bool;
+};
+
+type CouncilConfig = record {
+    council_id: text;
+    name: text;
+    members: vec LLMProvider;
+    chairman: text;
+    review_enabled: bool;
+    anonymize_reviews: bool;
+    max_rounds: nat8;
+};
+
+type CouncilSession = record {
+    session_id: text;
+    config: CouncilConfig;
+    council_query: CouncilQuery;
+    stage: CouncilStage;
+    individual_responses: vec LLMResponse;
+    reviews: vec ResponseReview;
+    rankings: vec record { text; nat8 };
+    final_response: opt text;
+    chairman_summary: opt text;
+    total_tokens: nat32;
+    total_latency_ms: nat64;
+    created_at: nat64;
+    completed_at: opt nat64;
+};
+
+type CouncilResult = record {
+    session_id: text;
+    user_query: text;
+    final_response: text;
+    individual_responses: vec LLMResponse;
+    rankings: vec record { text; nat8 };
+    confidence_score: float32;
+    dissent_notes: opt text;
+    processing_time_ms: nat64;
+};
+
+// Memory Types
+type MemoryType = variant {
+    ShortTerm;
+    LongTerm;
+    Episodic;
+    Semantic;
+    Procedural;
+};
+
+type Memory = record {
+    id: text;
+    memory_type: MemoryType;
+    content: text;
+    summary: opt text;
+    embedding: opt vec float32;
+    importance: float32;
+    access_count: nat32;
+    last_accessed: nat64;
+    created_at: nat64;
+    metadata: vec record { text; text };
+    related_memories: vec text;
+    tags: vec text;
+};
+
+type NodeType = variant {
+    Entity;
+    Concept;
+    Event;
+    Action;
+    Attribute;
+};
+
+type KnowledgeNode = record {
+    id: text;
+    node_type: NodeType;
+    label: text;
+    properties: vec record { text; text };
+    embedding: opt vec float32;
+    created_at: nat64;
+    updated_at: nat64;
+};
+
+type AgentMemory = record {
+    agent_id: text;
+    context_window: vec text;
+    context_size: nat64;
+};
+
+service : {
+    // Route Optimization
+    optimize_route: (text, text) -> (variant { Ok: RouteOptimization; Err: text });
+    predict_eta: (text, text, opt text) -> (ETAPrediction) query;
+    optimize_fuel: (text, text, float64) -> (FuelOptimization) query;
+    
+    // Cache Management
+    clear_cache: () -> (variant { Ok: nat64; Err: text });
+    get_cache_stats: () -> (nat64, nat64) query;
+    get_cached_route: (text, text) -> (opt RouteOptimization) query;
+    
+    // Config
+    get_config: () -> (AIConfig) query;
+    health: () -> (text) query;
+    
+    // LLM Council API
+    create_council_query: (text, text) -> (variant { Ok: text; Err: text });
+    add_council_response: (text, text, text, text, nat32, nat64) -> (variant { Ok: text; Err: text });
+    add_council_review: (text, text, text, nat8, nat8, nat8, nat8, text) -> (variant { Ok: text; Err: text });
+    finalize_council_response: (text, text, text) -> (variant { Ok: CouncilResult; Err: text });
+    get_council_session: (text) -> (opt CouncilSession) query;
+    get_chairman_prompt: (text) -> (variant { Ok: text; Err: text }) query;
+    get_council_config: () -> (CouncilConfig) query;
+    
+    // Agent Memory API
+    get_agent_memory: (text) -> (AgentMemory);
+    remember: (text, text, text, float32, vec text) -> (variant { Ok: text; Err: text });
+    recall: (text, text, nat32) -> (vec Memory) query;
+    add_context: (text, text) -> (variant { Ok: text; Err: text });
+    get_context: (text) -> (text) query;
+    add_knowledge_node: (text, text, text, vec record { text; text }) -> (variant { Ok: text; Err: text });
+    add_knowledge_edge: (text, text, text, text, float32) -> (variant { Ok: text; Err: text });
+    find_knowledge_node: (text, text) -> (opt KnowledgeNode) query;
+    maintain_memory: (text) -> (variant { Ok: text; Err: text });
+    get_memory_stats: (text) -> (nat64, nat64, nat64) query;
+}

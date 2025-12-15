@@ -1,0 +1,23 @@
+// Candid argument type for update_multichain_metadata
+type MultichainArgs = record {
+    eth_contract : opt text;
+    eth_token_id : opt text;
+    evm_chain_id : opt nat64;
+    erc1155_contract : opt text;
+    erc1155_token_id : opt text;
+    sol_mint : opt text;
+    sol_edition : opt text;
+    btc_inscription : opt text;
+    btc_brc20 : opt text;
+    btc_runes : opt text;
+    ton_collection : opt text;
+    ton_item : opt text;
+    sui_object_id : opt text;
+    sui_package_id : opt text;
+    bridge_protocol : opt text;
+    bridge_address : opt text;
+};
+
+
+
+

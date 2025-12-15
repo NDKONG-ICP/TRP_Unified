@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400">
+  <defs>
+    <linearGradient id="bg4" x1="50%" y1="0%" x2="50%" y2="100%">
+      <stop offset="0%" style="stop-color:#1e1e30"/>
+      <stop offset="100%" style="stop-color:#0a0a15"/>
+    </linearGradient>
+    <linearGradient id="gold4" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#ffeaa7"/>
+      <stop offset="50%" style="stop-color:#fdcb6e"/>
+      <stop offset="100%" style="stop-color:#f39c12"/>
+    </linearGradient>
+    <radialGradient id="glow4bg" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#fdcb6e;stop-opacity:0.2"/>
+      <stop offset="100%" style="stop-color:#fdcb6e;stop-opacity:0"/>
+    </radialGradient>
+    <filter id="glow4">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Background -->
+  <rect width="400" height="400" fill="url(#bg4)"/>
+  
+  <!-- Center glow -->
+  <circle cx="200" cy="180" r="100" fill="url(#glow4bg)"/>
+  
+  <!-- Circuit pattern -->
+  <g stroke="url(#gold4)" stroke-width="1" fill="none" opacity="0.25">
+    <path d="M50 200 L100 200 L120 180 L180 180"/>
+    <path d="M220 180 L280 180 L300 200 L350 200"/>
+    <path d="M200 100 L200 140"/>
+    <path d="M200 220 L200 260"/>
+    <circle cx="100" cy="200" r="5"/>
+    <circle cx="300" cy="200" r="5"/>
+    <circle cx="200" cy="100" r="5"/>
+    <circle cx="200" cy="260" r="5"/>
+  </g>
+  
+  <!-- Central AI eye -->
+  <g filter="url(#glow4)">
+    <ellipse cx="200" cy="180" rx="50" ry="35" fill="none" stroke="url(#gold4)" stroke-width="3"/>
+    <circle cx="200" cy="180" r="15" fill="url(#gold4)"/>
+    <circle cx="200" cy="180" r="8" fill="#1e1e30"/>
+    <circle cx="205" cy="175" r="3" fill="#fff" opacity="0.6"/>
+  </g>
+  
+  <!-- Orbital rings -->
+  <g fill="none" stroke="url(#gold4)" stroke-width="1" opacity="0.3">
+    <ellipse cx="200" cy="180" rx="80" ry="55" transform="rotate(15 200 180)"/>
+    <ellipse cx="200" cy="180" rx="80" ry="55" transform="rotate(-15 200 180)"/>
+  </g>
+  
+  <!-- AXIOM text -->
+  <text x="200" y="310" font-family="monospace" font-size="24" font-weight="bold" fill="url(#gold4)" text-anchor="middle" filter="url(#glow4)">AXIOM</text>
+  
+  <!-- Genesis badge -->
+  <text x="200" y="340" font-family="monospace" font-size="14" fill="#888" text-anchor="middle">Genesis #4</text>
+  
+  <!-- Corner dots -->
+  <circle cx="20" cy="20" r="4" fill="url(#gold4)" opacity="0.4"/>
+  <circle cx="380" cy="20" r="4" fill="url(#gold4)" opacity="0.4"/>
+  <circle cx="20" cy="380" r="4" fill="url(#gold4)" opacity="0.4"/>
+  <circle cx="380" cy="380" r="4" fill="url(#gold4)" opacity="0.4"/>
+</svg>
+
+
+
+

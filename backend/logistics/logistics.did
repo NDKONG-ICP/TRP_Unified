@@ -1,0 +1,91 @@
+type LoadStatus = variant {
+    Posted;
+    Bidding;
+    Assigned;
+    PickedUp;
+    InTransit;
+    Delivered;
+    Completed;
+    Cancelled;
+};
+
+type LoadType = variant {
+    DryVan;
+    Refrigerated;
+    Flatbed;
+    Tanker;
+    Container;
+    Other: text;
+};
+
+type Load = record {
+    id: text;
+    shipper: principal;
+    origin: text;
+    destination: text;
+    pickup_date: text;
+    delivery_date: text;
+    weight: text;
+    load_type: LoadType;
+    rate: nat64;
+    distance: text;
+    description: text;
+    status: LoadStatus;
+    assigned_driver: opt principal;
+    escrow_id: opt text;
+    created_at: nat64;
+    updated_at: nat64;
+};
+
+type Bid = record {
+    id: text;
+    load_id: text;
+    driver: principal;
+    amount: nat64;
+    message: text;
+    eta: text;
+    status: text;
+    created_at: nat64;
+};
+
+type PostLoadArgs = record {
+    origin: text;
+    destination: text;
+    pickup_date: text;
+    delivery_date: text;
+    weight: text;
+    load_type: LoadType;
+    rate: nat64;
+    distance: text;
+    description: text;
+};
+
+type LogisticsConfig = record {
+    admin: principal;
+    escrow_canister: principal;
+    kip_canister: principal;
+};
+
+service : {
+    // Load Management
+    post_load: (PostLoadArgs) -> (variant { Ok: Load; Err: text });
+    place_bid: (text, nat64, text, text) -> (variant { Ok: Bid; Err: text });
+    accept_bid: (text) -> (variant { Ok: Load; Err: text });
+    update_load_status: (text, LoadStatus) -> (variant { Ok: Load; Err: text });
+    
+    // Queries
+    get_load: (text) -> (opt Load) query;
+    get_available_loads: () -> (vec Load) query;
+    get_my_loads: () -> (vec Load) query;
+    get_bids_for_load: (text) -> (vec Bid) query;
+    get_my_bids: () -> (vec Bid) query;
+    get_total_loads: () -> (nat64) query;
+    get_config: () -> (LogisticsConfig) query;
+    health: () -> (text) query;
+}
+
+
+
+
+
+

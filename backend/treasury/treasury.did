@@ -1,0 +1,148 @@
+// Treasury Canister - Multi-chain management with admin controls
+// Admin principals: Cursor/Dev, Plug, OISY
+
+type TransactionType = variant {
+    Deposit;
+    Withdrawal;
+    PlatformFee;
+    NFTSale;
+    SubscriptionPayment;
+    Airdrop;
+    Reward;
+    Transfer;
+};
+
+type TokenType = variant {
+    ICP;
+    CkBTC;
+    CkETH;
+    CkUSDC;
+    CkUSDT;
+    HARLEE;
+    RAVEN;
+    BTC;
+    ETH;
+    SOL;
+    SUI;
+};
+
+type WithdrawalStatus = variant {
+    Pending;
+    Approved;
+    Executed;
+    Rejected;
+    Cancelled;
+};
+
+type Transaction = record {
+    id: nat64;
+    tx_type: TransactionType;
+    token: TokenType;
+    amount: nat64;
+    from: opt text;
+    to: opt text;
+    timestamp: nat64;
+    memo: text;
+    tx_hash: opt text;
+    chain: text;
+};
+
+type PendingWithdrawal = record {
+    id: nat64;
+    token: TokenType;
+    amount: nat64;
+    to_address: text;
+    chain: text;
+    requested_by: principal;
+    requested_at: nat64;
+    status: WithdrawalStatus;
+    approvals: vec principal;
+    rejection_reason: opt text;
+    executed_at: opt nat64;
+    tx_hash: opt text;
+};
+
+type TreasuryBalance = record {
+    icp: nat64;
+    ck_btc: nat64;
+    ck_eth: nat64;
+    ck_usdc: nat64;
+    ck_usdt: nat64;
+    harlee: nat64;
+    raven: nat64;
+    last_updated: nat64;
+};
+
+type MultiChainAddresses = record {
+    icp_principal: text;
+    icp_account_id: text;
+    btc_address: text;
+    eth_address: text;
+    sol_address: text;
+};
+
+type TreasuryConfig = record {
+    admin_principals: vec text;
+    withdrawal_threshold: nat64;
+    multi_sig_required: bool;
+    required_approvals: nat8;
+    multi_chain_addresses: MultiChainAddresses;
+    platform_fee_percentage: nat64;
+    paused: bool;
+};
+
+type TreasuryStats = record {
+    total_icp_balance: nat64;
+    total_ckbtc_balance: nat64;
+    total_cketh_balance: nat64;
+    total_ckusdc_balance: nat64;
+    total_harlee_balance: nat64;
+    total_raven_balance: nat64;
+    total_transactions: nat64;
+    pending_withdrawals: nat64;
+    total_collected_icp: nat64;
+    total_withdrawn_icp: nat64;
+    last_updated: nat64;
+};
+
+service : {
+    // Deposit functions
+    deposit: (TokenType, nat64, text, text) -> (variant { Ok: nat64; Err: text });
+    deposit_platform_fee: (nat64, principal, text) -> (variant { Ok: nat64; Err: text });
+    deposit_harlee_rewards: (nat64, text) -> (variant { Ok: nat64; Err: text });
+    distribute_harlee_reward: (principal, nat64, text) -> (variant { Ok: nat64; Err: text });
+    
+    // Withdrawal functions (admin only)
+    request_withdrawal: (TokenType, nat64, text) -> (variant { Ok: nat64; Err: text });
+    approve_withdrawal: (nat64) -> (variant { Ok; Err: text });
+    execute_withdrawal: (nat64) -> (variant { Ok: text; Err: text });
+    reject_withdrawal: (nat64, text) -> (variant { Ok; Err: text });
+    
+    // ICRC-1 Ledger Integration (real token balances)
+    fetch_harlee_balance: () -> (variant { Ok: nat64; Err: text });
+    fetch_icp_balance: () -> (variant { Ok: nat64; Err: text });
+    fetch_all_balances: () -> (variant { Ok: TreasuryBalance; Err: text });
+    transfer_harlee: (principal, nat64, opt text) -> (variant { Ok: nat64; Err: text });
+    distribute_staking_reward: (principal, nat64, nat32) -> (variant { Ok: nat64; Err: text });
+    
+    // Query functions
+    get_balance: () -> (TreasuryBalance) query;
+    get_token_balance_query: (TokenType) -> (nat64) query;
+    get_transaction: (nat64) -> (opt Transaction) query;
+    get_transactions: (nat64, nat64) -> (vec Transaction) query;
+    get_pending_withdrawals: () -> (vec PendingWithdrawal) query;
+    get_config: () -> (TreasuryConfig) query;
+    get_multi_chain_addresses: () -> (MultiChainAddresses) query;
+    get_admin_principals: () -> (vec text) query;
+    is_caller_admin: () -> (bool) query;
+    get_treasury_stats: () -> (TreasuryStats) query;
+    
+    // Admin configuration (admin only)
+    update_config: (opt nat64, opt bool, opt nat8, opt nat64, opt bool) -> (variant { Ok; Err: text });
+    add_admin: (text) -> (variant { Ok; Err: text });
+    remove_admin: (text) -> (variant { Ok; Err: text });
+    update_multi_chain_addresses: (opt text, opt text, opt text) -> (variant { Ok; Err: text });
+    
+    // Health check
+    health: () -> (text) query;
+}

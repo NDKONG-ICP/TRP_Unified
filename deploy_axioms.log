@@ -1,0 +1,59 @@
+Starting AXIOM Genesis NFT Deployment...
+=========================================
+Deploying AXIOM Genesis #1...
+WARN: The ic_deploy identity is not stored securely. Do not use it to control a lot of cycles/ICP. Create a new identity with `dfx identity new` and use it in mainnet-facing commands with the `--identity` flag
+Deploying: axiom_1
+Creating canisters...
+Creating canister axiom_1...
+thread 'main' panicked at src/dfx/src/main.rs:79:14:
+Failed to set stderr output color.: ColorOutOfRange
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+/Users/williambeck/The Forge NFT Minter/raven-unified-ecosystem/deploy_axioms.sh: line 17:  2525 Abort trap: 6           dfx deploy axiom_1 --network ic --yes --argument "(record { token_id = 1 : nat64; name = \"AXIOM Genesis #1\"; description = \"The First Oracle - Wise blockchain analyst\"; owner = principal \"$OWNER\"; personality = opt \"Wise and analytical\"; specialization = opt \"Blockchain Expert\" })" 2>&1
+Deploying AXIOM Genesis #2...
+
+thread 'main' panicked at src/dfx/src/main.rs:94:18:
+Failed to set stderr output color.: ColorOutOfRange
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+/Users/williambeck/The Forge NFT Minter/raven-unified-ecosystem/deploy_axioms.sh: line 21: 41914 Abort trap: 6           dfx deploy axiom_2 --network ic --yes --argument "(record { token_id = 2 : nat64; name = \"AXIOM Genesis #2\"; description = \"The Creative Mind - NFT and art specialist\"; owner = principal \"$OWNER\"; personality = opt \"Creative and visionary\"; specialization = opt \"NFT Art Expert\" })" 2>&1
+Deploying AXIOM Genesis #3...
+
+thread 'main' panicked at src/dfx/src/main.rs:94:18:
+Failed to set stderr output color.: ColorOutOfRange
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+/Users/williambeck/The Forge NFT Minter/raven-unified-ecosystem/deploy_axioms.sh: line 25: 41916 Abort trap: 6           dfx deploy axiom_3 --network ic --yes --argument "(record { token_id = 3 : nat64; name = \"AXIOM Genesis #3\"; description = \"The DeFi Sage - Finance and trading guru\"; owner = principal \"$OWNER\"; personality = opt \"Calculated and precise\"; specialization = opt \"DeFi Strategist\" })" 2>&1
+Deploying AXIOM Genesis #4...
+
+thread 'main' panicked at src/dfx/src/main.rs:94:18:
+Failed to set stderr output color.: ColorOutOfRange
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+/Users/williambeck/The Forge NFT Minter/raven-unified-ecosystem/deploy_axioms.sh: line 29: 41918 Abort trap: 6           dfx deploy axiom_4 --network ic --yes --argument "(record { token_id = 4 : nat64; name = \"AXIOM Genesis #4\"; description = \"The Tech Architect - Smart contract specialist\"; owner = principal \"$OWNER\"; personality = opt \"Technical and thorough\"; specialization = opt \"Smart Contract Developer\" })" 2>&1
+Deploying AXIOM Genesis #5...
+
+thread 'main' panicked at src/dfx/src/main.rs:94:18:
+Failed to set stderr output color.: ColorOutOfRange
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+/Users/williambeck/The Forge NFT Minter/raven-unified-ecosystem/deploy_axioms.sh: line 33: 41920 Abort trap: 6           dfx deploy axiom_5 --network ic --yes --argument "(record { token_id = 5 : nat64; name = \"AXIOM Genesis #5\"; description = \"The Community Builder - Engagement specialist\"; owner = principal \"$OWNER\"; personality = opt \"Friendly and engaging\"; specialization = opt \"Community Manager\" })" 2>&1
+=========================================
+AXIOM Genesis NFT Deployment Complete!
+Checking canister status...
+
+thread 'main' panicked at src/dfx/src/main.rs:94:18:
+Failed to set stderr output color.: ColorOutOfRange
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'main' panicked at src/dfx/src/main.rs:94:18:
+Failed to set stderr output color.: ColorOutOfRange
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'main' panicked at src/dfx/src/main.rs:94:18:
+Failed to set stderr output color.: ColorOutOfRange
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'main' panicked at src/dfx/src/main.rs:94:18:
+Failed to set stderr output color.: ColorOutOfRange
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+thread 'main' panicked at src/dfx/src/main.rs:94:18:
+Failed to set stderr output color.: ColorOutOfRange
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+Done!

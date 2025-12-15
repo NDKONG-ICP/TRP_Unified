@@ -1,0 +1,59 @@
+type UserRole = variant {
+    Admin;
+    User;
+    Driver;
+    Shipper;
+    Warehouse;
+};
+
+type WalletAddresses = record {
+    icp: opt text;
+    evm: opt text;
+    btc: opt text;
+    sol: opt text;
+};
+
+type UserProfile = record {
+    user_principal: principal;
+    display_name: text;
+    email: opt text;
+    role: UserRole;
+    created_at: nat64;
+    last_login: nat64;
+    kyc_verified: bool;
+    wallet_addresses: WalletAddresses;
+};
+
+type AdminConfig = record {
+    admin_principal: principal;
+    platform_fee_bps: nat16;
+    treasury_principal: principal;
+    paused: bool;
+};
+
+service : {
+    // User Management
+    register_user: () -> (variant { Ok: UserProfile; Err: text });
+    update_profile: (text, opt text) -> (variant { Ok: UserProfile; Err: text });
+    get_profile: (principal) -> (opt UserProfile) query;
+    get_my_profile: () -> (opt UserProfile) query;
+    get_user_role: (principal) -> (opt UserRole) query;
+    get_total_users: () -> (nat64) query;
+    get_verified_drivers: () -> (vec UserProfile) query;
+    
+    // Admin Functions
+    set_user_role: (principal, UserRole) -> (variant { Ok; Err: text });
+    set_kyc_verified: (principal, bool) -> (variant { Ok; Err: text });
+    update_config: (nat16, principal) -> (variant { Ok; Err: text });
+    set_paused: (bool) -> (variant { Ok; Err: text });
+    get_config: () -> (AdminConfig) query;
+    is_paused: () -> (bool) query;
+    
+    // Health
+    health: () -> (text) query;
+    get_canister_info: () -> (text) query;
+}
+
+
+
+

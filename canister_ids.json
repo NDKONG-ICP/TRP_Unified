@@ -1,0 +1,59 @@
+{
+  "ai_engine": {
+    "ic": "3enlo-7qaaa-aaaao-a4xcq-cai"
+  },
+  "assets": {
+    "ic": "3kpgg-eaaaa-aaaao-a4xdq-cai"
+  },
+  "axiom_1": {
+    "ic": "46odg-5iaaa-aaaao-a4xqa-cai"
+  },
+  "axiom_2": {
+    "ic": "4zpfs-qqaaa-aaaao-a4xqq-cai"
+  },
+  "axiom_3": {
+    "ic": "4ckzx-kiaaa-aaaao-a4xsa-cai"
+  },
+  "axiom_4": {
+    "ic": "4fl7d-hqaaa-aaaao-a4xsq-cai"
+  },
+  "axiom_5": {
+    "ic": "4miu7-ryaaa-aaaao-a4xta-cai"
+  },
+  "axiom_nft": {
+    "ic": "arx4x-cqaaa-aaaao-a4z5q-cai"
+  },
+  "core": {
+    "ic": "qb6fv-6aaaa-aaaao-a4w7q-cai"
+  },
+  "deepseek_model": {
+    "ic": "kqj56-2aaaa-aaaao-a4ygq-cai"
+  },
+  "escrow": {
+    "ic": "3wl4x-taaaa-aaaao-a4xbq-cai"
+  },
+  "kip": {
+    "ic": "3yjr7-iqaaa-aaaao-a4xaq-cai"
+  },
+  "logistics": {
+    "ic": "3dmn2-siaaa-aaaao-a4xca-cai"
+  },
+  "nft": {
+    "ic": "37ixl-fiaaa-aaaao-a4xaa-cai"
+  },
+  "queen_bee": {
+    "ic": "k6lqw-bqaaa-aaaao-a4yhq-cai"
+  },
+  "raven_ai": {
+    "ic": "3noas-jyaaa-aaaao-a4xda-cai"
+  },
+  "staking": {
+    "ic": "inutw-jiaaa-aaaao-a4yja-cai"
+  },
+  "treasury": {
+    "ic": "3rk2d-6yaaa-aaaao-a4xba-cai"
+  },
+  "vector_db": {
+    "ic": "kzkwc-miaaa-aaaao-a4yha-cai"
+  }
+}

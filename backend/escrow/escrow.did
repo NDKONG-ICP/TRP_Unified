@@ -1,0 +1,82 @@
+type EscrowStatus = variant {
+    Created;
+    Funded;
+    PickupConfirmed;
+    InTransit;
+    DeliveryConfirmed;
+    Released;
+    Disputed;
+    Refunded;
+    Cancelled;
+};
+
+type Escrow = record {
+    id: text;
+    load_id: text;
+    nft_token_id: opt nat64;
+    shipper: principal;
+    driver: principal;
+    warehouse: opt principal;
+    amount: nat64;
+    platform_fee: nat64;
+    status: EscrowStatus;
+    pickup_qr: text;
+    delivery_qr: text;
+    pickup_confirmed_at: opt nat64;
+    delivery_confirmed_at: opt nat64;
+    created_at: nat64;
+    updated_at: nat64;
+    metadata: text;
+};
+
+type QRVerification = record {
+    qr_code: text;
+    escrow_id: text;
+    verification_type: text;
+    verified_by: opt principal;
+    verified_at: opt nat64;
+    location: opt text;
+};
+
+type CreateEscrowArgs = record {
+    load_id: text;
+    driver: principal;
+    warehouse: opt principal;
+    amount: nat64;
+    metadata: text;
+};
+
+type EscrowConfig = record {
+    admin: principal;
+    platform_fee_bps: nat16;
+    treasury_canister: principal;
+    nft_canister: principal;
+    auto_release_delay: nat64;
+};
+
+service : {
+    // Escrow Management
+    create_escrow: (CreateEscrowArgs) -> (variant { Ok: Escrow; Err: text });
+    fund_escrow: (text) -> (variant { Ok: Escrow; Err: text });
+    verify_qr: (text, opt text) -> (variant { Ok: Escrow; Err: text });
+    release_payment: (text) -> (variant { Ok: Escrow; Err: text });
+    dispute_escrow: (text, text) -> (variant { Ok: Escrow; Err: text });
+    
+    // Queries
+    get_escrow: (text) -> (opt Escrow) query;
+    get_my_escrows: () -> (vec Escrow) query;
+    get_escrows_by_status: (EscrowStatus) -> (vec Escrow) query;
+    verify_qr_code: (text) -> (opt QRVerification) query;
+    get_config: () -> (EscrowConfig) query;
+    
+    // Admin
+    resolve_dispute: (text, bool) -> (variant { Ok: Escrow; Err: text });
+    update_config: (nat16, principal, principal) -> (variant { Ok; Err: text });
+    health: () -> (text) query;
+}
+
+
+
+
+
+

@@ -1,0 +1,47 @@
+// Vector Database Sharding Canister
+// Stores and queries sharded vector embeddings for persistent memory
+
+type VectorEmbedding = record {
+    id: text;
+    vector: vec float32;
+    metadata: vec record { text; text };
+    timestamp: nat64;
+    importance: float32;
+    shard_id: nat32;
+};
+
+type QueryRequest = record {
+    query_vector: vec float32;
+    top_k: nat32;
+    min_similarity: float32;
+    filter_metadata: opt vec record { text; text };
+};
+
+type QueryResult = record {
+    id: text;
+    vector: vec float32;
+    similarity: float32;
+    metadata: vec record { text; text };
+    timestamp: nat64;
+};
+
+service : {
+    // Vector Storage
+    store_vector: (VectorEmbedding) -> (variant { Ok; Err: text });
+    get_vector: (text) -> (variant { Ok: VectorEmbedding; Err: text }) query;
+    delete_vector: (text) -> (variant { Ok; Err: text });
+    
+    // Vector Search
+    query_vectors: (QueryRequest) -> (variant { Ok: vec QueryResult; Err: text }) query;
+    query_similar: (vec float32, nat32) -> (variant { Ok: vec QueryResult; Err: text }) query;
+    
+    // Shard Management
+    get_shard_info: () -> (nat32, nat64) query; // (shard_id, vector_count)
+    get_all_vector_ids: () -> (vec text) query;
+    
+    // Health & Status
+    get_status: () -> (bool, nat64, nat64) query; // (ready, cycles_available, vectors_stored)
+}
+
+
+

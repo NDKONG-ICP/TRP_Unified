@@ -1,0 +1,169 @@
+{
+  "canisters": {
+    "assets": {
+      "frontend": {
+        "entrypoint": "frontend/dist/index.html"
+      },
+      "source": ["frontend/dist"],
+      "type": "assets"
+    },
+    "core": {
+      "candid": "backend/core/core.did",
+      "package": "core",
+      "type": "rust",
+      "source": ["backend/core"]
+    },
+    "nft": {
+      "candid": "backend/nft/nft.did",
+      "package": "nft",
+      "type": "rust",
+      "source": ["backend/nft"]
+    },
+    "kip": {
+      "candid": "backend/kip/kip.did",
+      "package": "kip",
+      "type": "rust",
+      "source": ["backend/kip"],
+      "metadata": [
+        {
+          "name": "candid:service",
+          "path": "backend/kip/kip.did"
+        }
+      ]
+    },
+    "treasury": {
+      "candid": "backend/treasury/treasury.did",
+      "package": "treasury",
+      "type": "rust",
+      "source": ["backend/treasury"]
+    },
+    "escrow": {
+      "candid": "backend/escrow/escrow.did",
+      "package": "escrow",
+      "type": "rust",
+      "source": ["backend/escrow"]
+    },
+    "logistics": {
+      "candid": "backend/logistics/logistics.did",
+      "package": "logistics",
+      "type": "rust",
+      "source": ["backend/logistics"]
+    },
+    "ai_engine": {
+      "candid": "backend/ai_engine/ai_engine.did",
+      "package": "ai_engine",
+      "type": "rust",
+      "source": ["backend/ai_engine"]
+    },
+    "raven_ai": {
+      "candid": "backend/raven_ai/raven_ai.did",
+      "package": "raven_ai",
+      "type": "rust",
+      "source": ["backend/raven_ai"]
+    },
+    "deepseek_model": {
+      "candid": "backend/deepseek_model/deepseek_model.did",
+      "package": "deepseek_model",
+      "type": "rust",
+      "source": ["backend/deepseek_model"]
+    },
+    "vector_db": {
+      "candid": "backend/vector_db/vector_db.did",
+      "package": "vector_db",
+      "type": "rust",
+      "source": ["backend/vector_db"]
+    },
+    "queen_bee": {
+      "candid": "backend/queen_bee/queen_bee.did",
+      "package": "queen_bee",
+      "type": "rust",
+      "source": ["backend/queen_bee"]
+    },
+    "axiom_nft": {
+      "candid": "backend/axiom_nft/axiom_nft.did",
+      "package": "axiom_nft",
+      "type": "rust",
+      "source": ["backend/axiom_nft"]
+    },
+    "axiom_1": {
+      "candid": "backend/axiom_nft/axiom_nft.did",
+      "package": "axiom_nft",
+      "type": "rust",
+      "source": ["backend/axiom_nft"],
+      "args": "(record { token_id = 1 : nat64; name = \"AXIOM Genesis #1\"; description = \"The First Oracle - Wise blockchain analyst\"; owner = principal \"yyirv-5pjkg-oupac-gzja4-ljzfn-6mvon-r5w2i-6e7wm-sde75-wuses-nqe\"; personality = opt \"Wise and analytical\"; specialization = opt \"Blockchain Expert\" })"
+    },
+    "axiom_2": {
+      "candid": "backend/axiom_nft/axiom_nft.did",
+      "package": "axiom_nft",
+      "type": "rust",
+      "source": ["backend/axiom_nft"],
+      "args": "(record { token_id = 2 : nat64; name = \"AXIOM Genesis #2\"; description = \"The Creative Mind - NFT and art specialist\"; owner = principal \"yyirv-5pjkg-oupac-gzja4-ljzfn-6mvon-r5w2i-6e7wm-sde75-wuses-nqe\"; personality = opt \"Creative and visionary\"; specialization = opt \"NFT Art Expert\" })"
+    },
+    "axiom_3": {
+      "candid": "backend/axiom_nft/axiom_nft.did",
+      "package": "axiom_nft",
+      "type": "rust",
+      "source": ["backend/axiom_nft"],
+      "args": "(record { token_id = 3 : nat64; name = \"AXIOM Genesis #3\"; description = \"The DeFi Sage - Finance and trading guru\"; owner = principal \"yyirv-5pjkg-oupac-gzja4-ljzfn-6mvon-r5w2i-6e7wm-sde75-wuses-nqe\"; personality = opt \"Calculated and precise\"; specialization = opt \"DeFi Strategist\" })"
+    },
+    "axiom_4": {
+      "candid": "backend/axiom_nft/axiom_nft.did",
+      "package": "axiom_nft",
+      "type": "rust",
+      "source": ["backend/axiom_nft"],
+      "args": "(record { token_id = 4 : nat64; name = \"AXIOM Genesis #4\"; description = \"The Tech Architect - Smart contract specialist\"; owner = principal \"yyirv-5pjkg-oupac-gzja4-ljzfn-6mvon-r5w2i-6e7wm-sde75-wuses-nqe\"; personality = opt \"Technical and thorough\"; specialization = opt \"Smart Contract Developer\" })"
+    },
+    "axiom_5": {
+      "candid": "backend/axiom_nft/axiom_nft.did",
+      "package": "axiom_nft",
+      "type": "rust",
+      "source": ["backend/axiom_nft"],
+      "args": "(record { token_id = 5 : nat64; name = \"AXIOM Genesis #5\"; description = \"The Community Builder - Engagement specialist\"; owner = principal \"yyirv-5pjkg-oupac-gzja4-ljzfn-6mvon-r5w2i-6e7wm-sde75-wuses-nqe\"; personality = opt \"Friendly and engaging\"; specialization = opt \"Community Manager\" })"
+    },
+    "staking": {
+      "candid": "backend/staking/staking.did",
+      "package": "staking",
+      "type": "rust",
+      "source": ["backend/staking"]
+    },
+    "siwe_canister": {
+      "candid": "backend/siwe_canister/siwe_canister.did",
+      "package": "siwe_canister",
+      "type": "rust",
+      "source": ["backend/siwe_canister"]
+    },
+    "siws_canister": {
+      "candid": "backend/siws_canister/siws_canister.did",
+      "package": "siws_canister",
+      "type": "rust",
+      "source": ["backend/siws_canister"]
+    },
+    "siwb_canister": {
+      "candid": "backend/siwb_canister/siwb_canister.did",
+      "package": "siwb_canister",
+      "type": "rust",
+      "source": ["backend/siwb_canister"]
+    },
+    "sis_canister": {
+      "candid": "backend/sis_canister/sis_canister.did",
+      "package": "sis_canister",
+      "type": "rust",
+      "source": ["backend/sis_canister"]
+    },
+    "ordinals_canister": {
+      "candid": "backend/ordinals_canister/ordinals_canister.did",
+      "package": "ordinals_canister",
+      "type": "rust",
+      "source": ["backend/ordinals_canister"]
+    }
+  },
+  "defaults": {
+    "build": {
+      "args": "",
+      "packtool": ""
+    }
+  },
+  "output_env_file": ".env",
+  "version": 1
+}
+

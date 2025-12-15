@@ -1,0 +1,36 @@
+type SIWSMessage = record {
+  domain: text;
+  address: text;
+  statement: opt text;
+  uri: text;
+  version: text;
+  chain_id: text;
+  nonce: text;
+  issued_at: text;
+  expiration_time: opt text;
+  not_before: opt text;
+  request_id: opt text;
+  resources: opt vec text;
+};
+
+type SIWSSession = record {
+  session_id: text;
+  solana_address: text;
+  principal: principal;
+  created_at: nat64;
+  expires_at: nat64;
+};
+
+type VerifyResult = variant {
+  Ok: SIWSSession;
+  Err: text;
+};
+
+service : {
+  verify_siws: (SIWSMessage, text) -> (VerifyResult);
+  get_session: (text) -> (opt SIWSSession) query;
+  get_principal_by_address: (text) -> (opt principal) query;
+  get_address_by_principal: (principal) -> (opt text) query;
+  revoke_session: (text) -> (bool);
+  cleanup_sessions: () -> (nat);
+};

@@ -1,0 +1,31 @@
+// Staking Canister - Raven Sk8 Punks NFT Staking with $HARLEE Rewards
+// Rate: 100 $HARLEE per week per staked NFT
+
+type StakedNFT = record {
+    token_id: nat64;
+    collection: text;
+    owner: principal;
+    staked_at: nat64;
+    last_claim_at: nat64;
+    pending_rewards: nat64;
+    rarity: text;
+    multiplier: float32;
+};
+
+type LeaderboardEntry = record {
+    user: principal;
+    total_staked: nat32;
+    total_rewards_earned: nat64;
+    rank: nat32;
+};
+
+service : {
+    stake_nft: (nat64, text) -> (variant { Ok: StakedNFT; Err: text });
+    unstake_nft: (nat64, text) -> (variant { Ok: nat64; Err: text });
+    claim_rewards: (nat64, text) -> (variant { Ok: nat64; Err: text });
+    get_staked_nfts: (principal) -> (vec StakedNFT) query;
+    get_pending_rewards: (principal) -> (nat64) query;
+    get_leaderboard: (nat32) -> (vec LeaderboardEntry) query;
+    set_harlee_ledger: (principal) -> (variant { Ok; Err: text });
+    distribute_rewards: () -> (variant { Ok: nat32; Err: text });
+}

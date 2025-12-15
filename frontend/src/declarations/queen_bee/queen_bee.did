@@ -1,0 +1,56 @@
+// Queen Bee AI Pipeline Orchestrator
+// Coordinates on-chain DeepSeek R1 inference, HTTP outcalls, voice processing, and memory storage
+
+type ChatMessage = record {
+    role: text;
+    content: text;
+    timestamp: nat64;
+};
+
+type AIRequest = record {
+    query_text: text;
+    system_prompt: opt text;
+    context: vec ChatMessage;
+    token_id: opt nat64;
+    use_onchain: bool;
+    use_http_parallel: bool;
+};
+
+type AIResponse = record {
+    response: text;
+    confidence_score: float32;
+    inference_method: text;
+    tokens_used: nat32;
+    latency_ms: nat64;
+    model_responses: vec record { text; text; float32 };
+};
+
+type VoiceRequest = record {
+    text: text;
+    voice_id: opt text;
+    stability: opt float32;
+    similarity_boost: opt float32;
+};
+
+type VoiceResponse = record {
+    audio_base64: text;
+    duration_ms: nat64;
+    characters_used: nat32;
+};
+
+type MemoryResult = record {
+    id: text;
+    vector: vec float32;
+    similarity: float32;
+    metadata: vec record { text; text };
+};
+
+service : {
+    register_model_canister: (nat32, principal) -> (variant { Ok; Err: text });
+    register_vector_db_canister: (nat32, principal) -> (variant { Ok; Err: text });
+    process_ai_request: (AIRequest) -> (variant { Ok: AIResponse; Err: text });
+    synthesize_voice: (VoiceRequest) -> (variant { Ok: VoiceResponse; Err: text });
+    store_memory: (text, vec float32, vec record { text; text }, float32) -> (variant { Ok: text; Err: text });
+    query_memory: (text, nat32) -> (variant { Ok: vec MemoryResult; Err: text }) query;
+    get_status: () -> (bool, nat64, nat32, nat32) query;
+}

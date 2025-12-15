@@ -1,0 +1,442 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-raven-gray;
+    box-sizing: border-box;
+  }
+  
+  html {
+    overflow-x: hidden;
+    scroll-behavior: smooth;
+    -webkit-tap-highlight-color: transparent;
+    width: 100%;
+    max-width: 100vw;
+    position: relative;
+  }
+  
+  body {
+    @apply bg-raven-black text-white font-sans;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+    min-height: 100vh;
+    min-height: 100dvh; /* Dynamic viewport height for mobile */
+    width: 100%;
+    max-width: 100vw;
+    position: relative;
+    margin: 0;
+    padding: 0;
+  }
+  
+  #root {
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: hidden;
+    position: relative;
+  }
+  
+  /* Mobile touch optimization */
+  button, a, input, textarea, select {
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: rgba(212, 175, 55, 0.2);
+  }
+  
+  /* Prevent iOS text size adjustment */
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  /* Mobile-specific improvements */
+  @media (max-width: 768px) {
+    /* Ensure all containers respect viewport width */
+    * {
+      max-width: 100vw;
+    }
+    
+    /* Improve touch targets on mobile */
+    button, a, input, select {
+      min-height: 44px; /* iOS recommended touch target size */
+      min-width: 44px;
+    }
+    
+    /* Better text sizing on mobile */
+    body {
+      font-size: 16px; /* Prevent iOS zoom on input focus */
+    }
+    
+    /* Improve scrolling on mobile */
+    * {
+      -webkit-overflow-scrolling: touch;
+    }
+  }
+  
+  /* Very small screens */
+  @media (max-width: 480px) {
+    body {
+      font-size: 14px;
+    }
+    
+    h1 {
+      font-size: 1.75rem;
+    }
+    
+    h2 {
+      font-size: 1.5rem;
+    }
+    
+    h3 {
+      font-size: 1.25rem;
+    }
+  }
+  
+  /* Touch device optimizations */
+  @media (hover: none) and (pointer: coarse) {
+    /* Remove hover effects on touch devices */
+    *:hover {
+      transform: none !important;
+    }
+    
+    /* Use active states instead */
+    button:active, a:active {
+      opacity: 0.8;
+      transform: scale(0.98);
+    }
+  }
+  
+  /* Prevent text selection on mobile (except inputs) */
+  @media (max-width: 768px) {
+    *:not(input):not(textarea):not([contenteditable]) {
+      -webkit-user-select: none;
+      -moz-user-select: none;
+      -ms-user-select: none;
+      user-select: none;
+    }
+    
+    input, textarea, [contenteditable] {
+      -webkit-user-select: text;
+      -moz-user-select: text;
+      -ms-user-select: text;
+      user-select: text;
+    }
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-raven-charcoal;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-gold-700 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-gold-500;
+  }
+
+  /* Selection */
+  ::selection {
+    @apply bg-gold-500/30 text-gold-100;
+  }
+}
+
+@layer components {
+  /* Glass morphism cards */
+  .glass {
+    @apply bg-raven-charcoal/80 backdrop-blur-md border border-gold-700/20;
+  }
+
+  .glass-dark {
+    @apply bg-raven-black/90 backdrop-blur-lg border border-gold-700/10;
+  }
+
+  .glass-gold {
+    @apply bg-gradient-to-br from-gold-900/20 to-raven-charcoal/80 backdrop-blur-md border border-gold-500/30;
+  }
+
+  /* Gold gradient text */
+  .text-gradient-gold {
+    @apply bg-gradient-to-r from-gold-400 via-gold-300 to-gold-500 bg-clip-text text-transparent;
+  }
+
+  /* Shimmer effect */
+  .shimmer {
+    @apply relative overflow-hidden;
+  }
+
+  .shimmer::after {
+    content: '';
+    @apply absolute inset-0;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(212, 175, 55, 0.1),
+      transparent
+    );
+    animation: shimmer 2s infinite;
+  }
+
+  /* Button styles */
+  .btn-gold {
+    @apply px-6 py-3 bg-gradient-to-r from-gold-600 to-gold-500 hover:from-gold-500 hover:to-gold-400 
+           text-raven-black font-semibold rounded-lg transition-all duration-300 
+           shadow-gold hover:shadow-gold-lg transform hover:scale-[1.02] active:scale-[0.98];
+  }
+
+  .btn-outline-gold {
+    @apply px-6 py-3 border-2 border-gold-500 text-gold-400 hover:bg-gold-500/10 
+           font-semibold rounded-lg transition-all duration-300;
+  }
+
+  .btn-ghost {
+    @apply px-6 py-3 text-silver-400 hover:text-gold-400 hover:bg-gold-500/5 
+           font-medium rounded-lg transition-all duration-300;
+  }
+
+  /* Card styles */
+  .card {
+    @apply glass rounded-2xl p-6 transition-all duration-300 hover:border-gold-500/40;
+  }
+
+  .card-hover {
+    @apply card hover:shadow-gold hover:transform hover:scale-[1.02];
+  }
+
+  /* Glass card - modern glassmorphism */
+  .glass-card {
+    @apply bg-black/40 backdrop-blur-xl rounded-2xl p-6 border border-gray-800 
+           hover:border-amber-500/30 transition-all duration-300;
+  }
+
+  /* Gold gradient text utility */
+  .gold-gradient-text {
+    @apply bg-gradient-to-r from-amber-400 via-yellow-300 to-amber-500 bg-clip-text text-transparent;
+  }
+
+  /* Primary button with gold gradient */
+  .btn-primary {
+    @apply bg-gradient-to-r from-amber-500 via-amber-600 to-yellow-500 text-black font-bold 
+           rounded-xl shadow-lg shadow-amber-500/30 hover:shadow-amber-500/50 
+           transition-all duration-300 hover:scale-[1.02] active:scale-[0.98];
+  }
+
+  /* Input styles */
+  .input {
+    @apply w-full px-4 py-3 bg-raven-dark border border-gold-700/30 rounded-lg 
+           text-white placeholder-silver-600 focus:outline-none focus:border-gold-500 
+           focus:ring-2 focus:ring-gold-500/20 transition-all duration-200;
+  }
+
+  /* Badge styles */
+  .badge {
+    @apply inline-flex items-center px-3 py-1 rounded-full text-sm font-medium;
+  }
+
+  .badge-gold {
+    @apply badge bg-gold-500/20 text-gold-400 border border-gold-500/30;
+  }
+
+  .badge-silver {
+    @apply badge bg-silver-500/20 text-silver-300 border border-silver-500/30;
+  }
+
+  /* Divider */
+  .divider-gold {
+    @apply h-px bg-gradient-to-r from-transparent via-gold-500/50 to-transparent;
+  }
+
+  /* Glow effects */
+  .glow-gold {
+    @apply shadow-gold-glow;
+  }
+
+  .glow-gold-sm {
+    @apply shadow-gold;
+  }
+
+  /* Forge-specific styles */
+  .forge-ember {
+    @apply absolute w-2 h-2 bg-spicy-flame rounded-full animate-spark;
+  }
+
+  .forge-flame {
+    @apply bg-gradient-to-t from-spicy-red via-spicy-orange to-spicy-flame animate-flame;
+  }
+}
+
+@layer utilities {
+  /* Hide scrollbar */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  /* Text balance */
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  /* Aspect ratios */
+  .aspect-card {
+    aspect-ratio: 3/4;
+  }
+
+  .aspect-banner {
+    aspect-ratio: 21/9;
+  }
+
+  /* Screen reader only */
+  .sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  /* Skip link for accessibility */
+  .skip-link {
+    @apply sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 
+           focus:z-50 focus:px-4 focus:py-2 focus:bg-gold-600 focus:text-black 
+           focus:rounded-lg focus:font-semibold;
+  }
+}
+
+/* Accessibility Styles */
+
+/* High Contrast Mode */
+.high-contrast {
+  --gold-400: #ffd700;
+  --gold-500: #ffcc00;
+  --gold-600: #ffb800;
+  --text-primary: #ffffff;
+  --text-secondary: #e0e0e0;
+  --bg-primary: #000000;
+  --border-color: #ffffff;
+}
+
+.high-contrast * {
+  border-color: var(--border-color) !important;
+}
+
+.high-contrast body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.high-contrast .glass,
+.high-contrast .glass-dark,
+.high-contrast .glass-gold {
+  background: #000000 !important;
+  border: 2px solid #ffffff !important;
+}
+
+/* Large Text Mode */
+.large-text {
+  font-size: 125%;
+}
+
+.large-text h1 { font-size: 3rem; }
+.large-text h2 { font-size: 2.5rem; }
+.large-text h3 { font-size: 2rem; }
+.large-text p, .large-text span, .large-text button { font-size: 1.25rem; }
+
+/* Reduced Motion */
+.reduce-motion *,
+.reduce-motion *::before,
+.reduce-motion *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* Enhanced Focus Indicators */
+.enhanced-focus *:focus {
+  outline: 3px solid #ffd700 !important;
+  outline-offset: 3px !important;
+}
+
+.enhanced-focus *:focus-visible {
+  outline: 4px solid #ffd700 !important;
+  outline-offset: 4px !important;
+  box-shadow: 0 0 0 8px rgba(255, 215, 0, 0.3) !important;
+}
+
+/* Dyslexia-Friendly Font */
+.dyslexia-font {
+  font-family: 'OpenDyslexic', 'Comic Sans MS', 'Arial', sans-serif !important;
+  letter-spacing: 0.05em;
+  word-spacing: 0.1em;
+  line-height: 1.8;
+}
+
+/* Color Blind Modes */
+[data-color-blind-mode="protanopia"] {
+  filter: url('#protanopia-filter');
+}
+
+[data-color-blind-mode="deuteranopia"] {
+  filter: url('#deuteranopia-filter');
+}
+
+[data-color-blind-mode="tritanopia"] {
+  filter: url('#tritanopia-filter');
+}
+
+/* Screen Reader Optimized */
+.sr-optimized [aria-hidden="true"] {
+  display: none !important;
+}
+
+.sr-optimized img:not([alt]) {
+  outline: 3px solid red !important;
+}
+
+/* RTL Support */
+[dir="rtl"] {
+  direction: rtl;
+  text-align: right;
+}
+
+[dir="rtl"] .flex {
+  flex-direction: row-reverse;
+}
+
+/* Focus trap for modals */
+.focus-trap [tabindex="-1"]:focus {
+  outline: none;
+}
+
+/* Print styles for accessibility */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  
+  body {
+    color: black !important;
+    background: white !important;
+  }
+  
+  a[href]::after {
+    content: " (" attr(href) ")";
+  }
+}
+

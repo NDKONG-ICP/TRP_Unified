@@ -1,0 +1,37 @@
+type SIWBMessage = record {
+  domain: text;
+  address: text;
+  statement: opt text;
+  uri: text;
+  version: text;
+  chain_id: text;
+  nonce: text;
+  issued_at: text;
+  expiration_time: opt text;
+  not_before: opt text;
+  request_id: opt text;
+  resources: opt vec text;
+};
+
+type SIWBSession = record {
+  session_id: text;
+  bitcoin_address: text;
+  principal: principal;
+  created_at: nat64;
+  expires_at: nat64;
+};
+
+type VerifyResult = variant {
+  Ok: SIWBSession;
+  Err: text;
+};
+
+service : {
+  verify_siwb: (SIWBMessage, text) -> (VerifyResult);
+  get_session: (text) -> (opt SIWBSession) query;
+  get_principal_by_address: (text) -> (opt principal) query;
+  get_address_by_principal: (principal) -> (opt text) query;
+  revoke_session: (text) -> (bool);
+  cleanup_sessions: () -> (nat);
+};
+

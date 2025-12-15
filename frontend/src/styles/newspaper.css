@@ -1,0 +1,513 @@
+/* Parchment Background */
+.parchment-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: 
+    linear-gradient(rgba(255, 248, 220, 0.9), rgba(245, 238, 210, 0.9)),
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(139, 115, 85, 0.03) 2px,
+      rgba(139, 115, 85, 0.03) 4px
+    );
+  background-size: cover;
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* Newspaper Container */
+.newspaper-container {
+  max-width: 1200px;
+  margin: 40px auto;
+  padding: 40px;
+  background: rgba(255, 253, 245, 0.95);
+  box-shadow: 
+    0 0 20px rgba(0, 0, 0, 0.1),
+    inset 0 0 100px rgba(210, 180, 140, 0.3);
+  border: 2px solid #8b7355;
+  position: relative;
+  min-height: 100vh;
+}
+
+/* Newspaper Header */
+.newspaper-header {
+  text-align: center;
+  border-bottom: 4px double #000;
+  padding-bottom: 20px;
+  margin-bottom: 30px;
+  position: relative;
+}
+
+.newspaper-title-container {
+  position: relative;
+  margin: 20px 0;
+}
+
+.newspaper-tagline {
+  font-family: 'Old Standard TT', serif;
+  font-size: 0.85rem;
+  font-style: italic;
+  color: #555;
+  margin-top: 8px;
+  letter-spacing: 0.1em;
+}
+
+.newspaper-meta {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 15px;
+  margin-top: 15px;
+  font-family: 'Old Standard TT', serif;
+  font-size: 0.8rem;
+  color: #666;
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.meta-icon {
+  color: #8b7355;
+}
+
+.meta-divider {
+  color: #ccc;
+}
+
+.header-border {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(to right, transparent, #000 20%, #000 80%, transparent);
+}
+
+.newspaper-title {
+  font-family: 'Playfair Display', 'Old Standard TT', serif;
+  margin: 0;
+  line-height: 1;
+}
+
+.title-the {
+  display: block;
+  font-size: 1.5rem;
+  font-style: italic;
+  letter-spacing: 0.3em;
+  color: #444;
+}
+
+.title-raven {
+  display: block;
+  font-size: 5rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  text-shadow: 2px 2px 0px rgba(0, 0, 0, 0.1);
+  color: #000;
+  margin: 10px 0;
+}
+
+.title-chronicle {
+  display: block;
+  font-size: 2rem;
+  letter-spacing: 0.5em;
+  font-weight: 300;
+  color: #333;
+}
+
+.header-ornament {
+  position: absolute;
+  top: 50%;
+  width: 100px;
+  height: 2px;
+  background: linear-gradient(to right, transparent, #000, transparent);
+}
+
+.header-ornament.left { left: 10%; }
+.header-ornament.right { right: 10%; }
+
+.newspaper-date {
+  font-family: 'Old Standard TT', serif;
+  font-size: 0.9rem;
+  margin-top: 10px;
+  font-style: italic;
+  color: #444;
+}
+
+/* Page Layout */
+.newspaper-pages-wrapper {
+  min-height: 1000px;
+  perspective: 2000px;
+  position: relative;
+}
+
+.newspaper-page {
+  background: rgba(255, 253, 245, 1);
+  padding: 40px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 
+    0 5px 15px rgba(0, 0, 0, 0.1),
+    inset 0 0 50px rgba(210, 180, 140, 0.2),
+    0 0 0 1px rgba(139, 115, 85, 0.1);
+  transform-style: preserve-3d;
+  position: relative;
+  /* Torn paper edge effect */
+  background-image: 
+    linear-gradient(45deg, transparent 30%, rgba(139, 115, 85, 0.05) 30%, rgba(139, 115, 85, 0.05) 70%, transparent 70%),
+    linear-gradient(-45deg, transparent 30%, rgba(139, 115, 85, 0.05) 30%, rgba(139, 115, 85, 0.05) 70%, transparent 70%);
+  background-size: 20px 20px;
+}
+
+/* Article Styling */
+.lead-story {
+  border-bottom: 2px solid #000;
+  padding-bottom: 30px;
+  margin-bottom: 30px;
+}
+
+.lead-headline {
+  font-family: 'Playfair Display', serif;
+  font-size: 3rem;
+  font-weight: 900;
+  line-height: 1.1;
+  margin: 0 0 10px 0;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: #000;
+}
+
+.headline {
+  font-family: 'Playfair Display', serif;
+  font-size: 1.8rem;
+  font-weight: 700;
+  line-height: 1.2;
+  margin: 0 0 8px 0;
+  border-bottom: 1px solid #ccc;
+  padding-bottom: 5px;
+  color: #000;
+}
+
+.byline {
+  font-family: 'Old Standard TT', serif;
+  font-size: 0.85rem;
+  font-style: italic;
+  color: #666;
+  margin-bottom: 15px;
+}
+
+.article-columns {
+  column-count: 2;
+  column-gap: 30px;
+  column-rule: 1px solid #ddd;
+  text-align: justify;
+  hyphens: auto;
+}
+
+.lede {
+  font-family: 'Lora', serif;
+  font-size: 1.1rem;
+  line-height: 1.6;
+  margin: 0 0 15px 0;
+  color: #333;
+}
+
+.article-columns-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 30px;
+  margin-top: 30px;
+}
+
+.column-article {
+  border-right: 1px solid #ddd;
+  padding-right: 20px;
+}
+
+.column-article:last-child {
+  border-right: none;
+}
+
+.excerpt {
+  font-family: 'Lora', serif;
+  font-size: 0.95rem;
+  line-height: 1.6;
+  text-align: justify;
+  hyphens: auto;
+  color: #333;
+}
+
+.read-more, .read-more-link a {
+  font-family: 'Old Standard TT', serif;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #8b4513;
+  text-decoration: none;
+  border-bottom: 1px solid #8b4513;
+  transition: all 0.2s;
+}
+
+.read-more:hover, .read-more-link a:hover {
+  color: #5d2e0e;
+  border-bottom-color: #5d2e0e;
+}
+
+/* Comics Section */
+.comics-page {
+  padding: 20px;
+}
+
+.section-header {
+  font-family: 'Playfair Display', serif;
+  font-size: 2.5rem;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+  border-top: 3px double #000;
+  border-bottom: 3px double #000;
+  padding: 15px 0;
+  margin: 0 0 40px 0;
+  color: #000;
+}
+
+.header-decoration {
+  margin: 0 20px;
+  font-size: 1.5rem;
+}
+
+.comics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 30px;
+  margin-bottom: 40px;
+}
+
+.comic-panel {
+  text-align: center;
+}
+
+.comic-title {
+  font-family: 'Comic Neue', 'Comic Sans MS', cursive;
+  font-size: 1.3rem;
+  font-weight: 700;
+  margin-bottom: 10px;
+  color: #000;
+}
+
+.comic-border {
+  border: 3px solid #000;
+  padding: 10px;
+  background: #fff;
+  box-shadow: 3px 3px 0 rgba(0, 0, 0, 0.2);
+}
+
+.comic-border img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.comic-caption {
+  font-family: 'Comic Neue', cursive;
+  font-size: 0.9rem;
+  margin-top: 10px;
+  font-style: italic;
+  color: #333;
+  line-height: 1.4;
+}
+
+.comic-author {
+  font-family: 'Old Standard TT', serif;
+  font-size: 0.75rem;
+  color: #666;
+  margin-top: 5px;
+  font-style: italic;
+}
+
+.comic-actions {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed #ddd;
+}
+
+.comic-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  background: transparent;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: 'Old Standard TT', serif;
+  font-size: 0.8rem;
+  color: #666;
+  transition: all 0.2s;
+}
+
+.comic-action-btn:hover {
+  background: #f5f5f5;
+  border-color: #8b7355;
+  color: #8b7355;
+}
+
+.comics-empty {
+  text-align: center;
+  padding: 60px 20px;
+}
+
+.upload-hint {
+  font-family: 'Old Standard TT', serif;
+  font-size: 0.85rem;
+  color: #666;
+  margin-top: 10px;
+  font-style: italic;
+}
+
+/* Navigation */
+.newspaper-navigation {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 40px;
+  padding-top: 20px;
+  border-top: 2px solid #000;
+}
+
+.nav-button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'Old Standard TT', serif;
+  font-size: 1rem;
+  padding: 12px 24px;
+  background: #8b4513;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s;
+  box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+
+.nav-button:hover:not(:disabled) {
+  background: #5d2e0e;
+  transform: translateY(-2px);
+  box-shadow: 3px 3px 6px rgba(0, 0, 0, 0.3);
+}
+
+.nav-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.page-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'Old Standard TT', serif;
+  font-size: 1rem;
+  font-style: italic;
+  color: #333;
+}
+
+.page-number {
+  text-align: center;
+  font-family: 'Old Standard TT', serif;
+  font-size: 0.9rem;
+  margin-top: 30px;
+  color: #666;
+}
+
+/* Upload Comic Button */
+.upload-comic-section {
+  text-align: center;
+  margin-top: 40px;
+  padding-top: 20px;
+  border-top: 2px dashed #ccc;
+}
+
+.upload-comic-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-family: 'Old Standard TT', serif;
+  font-size: 1.1rem;
+  padding: 15px 40px;
+  background: #2c5f2d;
+  color: #fff;
+  border: 2px solid #1a3d1b;
+  cursor: pointer;
+  transition: all 0.3s;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  border-radius: 4px;
+}
+
+.upload-comic-btn:hover {
+  background: #1a3d1b;
+  transform: translateY(-2px);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
+}
+
+/* Empty State */
+.articles-page.empty {
+  text-align: center;
+  padding: 100px 20px;
+}
+
+.empty-message {
+  font-family: 'Lora', serif;
+  font-size: 1.2rem;
+  color: #666;
+  font-style: italic;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .newspaper-container {
+    padding: 20px;
+    margin: 20px auto;
+  }
+
+  .title-raven {
+    font-size: 3rem;
+  }
+
+  .article-columns {
+    column-count: 1;
+  }
+  
+  .article-columns-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .comics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .lead-headline {
+    font-size: 2rem;
+  }
+
+  .newspaper-navigation {
+    flex-direction: column;
+    gap: 15px;
+  }
+
+  .nav-button {
+    width: 100%;
+    justify-content: center;
+  }
+}
+

@@ -1,0 +1,27 @@
+{
+  "siwe_canister": {
+    "wasm": "deployment_package/siwe_canister.wasm",
+    "candid": "deployment_package/siwe_canister.did",
+    "wasm_size_kb": 578.6
+  },
+  "siws_canister": {
+    "wasm": "deployment_package/siws_canister.wasm",
+    "candid": "deployment_package/siws_canister.did",
+    "wasm_size_kb": 574.7
+  },
+  "siwb_canister": {
+    "wasm": "deployment_package/siwb_canister.wasm",
+    "candid": "deployment_package/siwb_canister.did",
+    "wasm_size_kb": 574.2
+  },
+  "sis_canister": {
+    "wasm": "deployment_package/sis_canister.wasm",
+    "candid": "deployment_package/sis_canister.did",
+    "wasm_size_kb": 574.1
+  },
+  "ordinals_canister": {
+    "wasm": "deployment_package/ordinals_canister.wasm",
+    "candid": "deployment_package/ordinals_canister.did",
+    "wasm_size_kb": 536.3
+  }
+}

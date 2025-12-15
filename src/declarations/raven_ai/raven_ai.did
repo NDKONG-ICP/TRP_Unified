@@ -1,0 +1,370 @@
+// RavenAI Agent NFT Canister Interface
+
+type PaymentToken = variant {
+    ICP;
+    RAVEN;
+    CkBTC;
+    CkETH;
+    CkUSDC;
+    CkUSDT;
+    CkSOL;
+    SOL;
+    SUI;
+    BOB;
+    MGSN;
+    ZOMBIE;
+    NAK;
+};
+
+type AgentType = variant {
+    RavenAI;
+    AXIOM: nat32;
+};
+
+type MultichainAddresses = record {
+    icp_principal: opt text;
+    evm_address: opt text;
+    btc_address: opt text;
+    sol_address: opt text;
+};
+
+type MemoryEntry = record {
+    id: text;
+    memory_type: text;
+    content: text;
+    importance: float32;
+    timestamp: nat64;
+    tags: vec text;
+};
+
+type KnowledgeNode = record {
+    id: text;
+    label: text;
+    node_type: text;
+    properties: vec record { text; text };
+    connections: vec text;
+    created_at: nat64;
+};
+
+type ChatMessage = record {
+    role: text;
+    content: text;
+    timestamp: nat64;
+};
+
+type AgentConfig = record {
+    name: text;
+    personality: text;
+    language: text;
+    voice_enabled: bool;
+    accessibility_mode: text;
+    custom_instructions: text;
+};
+
+type RavenAIAgent = record {
+    token_id: nat64;
+    agent_type: AgentType;
+    owner: principal;
+    canister_id: opt principal;
+    multichain_addresses: MultichainAddresses;
+    config: AgentConfig;
+    short_term_memory: vec MemoryEntry;
+    long_term_memory: vec MemoryEntry;
+    conversation_history: vec ChatMessage;
+    knowledge_nodes: vec KnowledgeNode;
+    total_interactions: nat64;
+    total_memories: nat64;
+    created_at: nat64;
+    last_active: nat64;
+    metadata: vec record { text; text };
+};
+
+type AxiomNFT = record {
+    number: nat32;
+    token_id: nat64;
+    owner: opt principal;
+    minted: bool;
+    minted_at: opt nat64;
+    dedicated_canister: opt principal;
+    agent: opt RavenAIAgent;
+};
+
+type PaymentRecord = record {
+    id: text;
+    payer: principal;
+    token: PaymentToken;
+    amount: nat64;
+    usd_value: float64;
+    agent_type: AgentType;
+    token_id: opt nat64;
+    status: text;
+    tx_hash: opt text;
+    created_at: nat64;
+    completed_at: opt nat64;
+};
+
+type LLMProviderConfig = record {
+    name: text;
+    api_url: text;
+    api_key: text;
+    model: text;
+    max_tokens: nat32;
+    temperature: float32;
+    weight: float32;
+    enabled: bool;
+};
+
+type Config = record {
+    admins: vec principal;
+    treasury_principal: principal;
+    btc_address: text;
+    raven_token_canister: principal;
+    next_token_id: nat64;
+    next_axiom_number: nat32;
+    total_agents_minted: nat64;
+    total_axiom_minted: nat32;
+    paused: bool;
+    llm_providers: opt vec LLMProviderConfig;
+};
+
+type MintResult = record {
+    canister_id: principal;
+    mint_number: nat32;
+    token_id: nat64;
+    cycles_allocated: nat;
+    payment_token: PaymentToken;
+    payment_amount: nat64;
+};
+
+type ArticlePersona = variant {
+    Raven;
+    Harlee;
+    Macho;
+};
+
+type NewsArticle = record {
+    id: nat64;
+    title: text;
+    slug: text;
+    excerpt: text;
+    content: text;
+    author_persona: ArticlePersona;
+    category: text;
+    tags: vec text;
+    seo_title: text;
+    seo_description: text;
+    seo_keywords: vec text;
+    published_at: nat64;
+    views: nat64;
+    likes: nat64;
+    shares: nat64;
+    harlee_rewards: nat64;
+    featured: bool;
+};
+
+type ArticleComment = record {
+    id: nat64;
+    article_id: nat64;
+    author: principal;
+    content: text;
+    timestamp: nat64;
+    likes: nat64;
+    edited: bool;
+};
+
+type TokenPrice = record {
+    token: PaymentToken;
+    usd_price: float64;
+    amount_for_100_usd: nat64;
+    decimals: nat8;
+};
+
+// Voice synthesis types
+type VoiceSynthesisRequest = record {
+    text: text;
+    voice_id: opt text;
+    model_id: opt text;
+    stability: opt float32;
+    similarity_boost: opt float32;
+};
+
+type VoiceSynthesisResponse = record {
+    audio_data: vec nat8;
+    content_type: text;
+};
+
+// AI Council types
+type AICouncilModelResponse = record {
+    model: text;
+    response: text;
+    success: bool;
+    error: opt text;
+    latency_ms: nat64;
+    tokens_generated: opt nat32;
+};
+
+type AICouncilConsensus = record {
+    final_response: text;
+    confidence_score: float32;
+    agreement_level: float32;
+    key_points: vec text;
+    dissenting_views: vec text;
+    synthesis_method: text;
+};
+
+type AICouncilSession = record {
+    session_id: text;
+    user: principal;
+    user_query: text;
+    system_prompt: opt text;
+    context: vec ChatMessage;
+    responses: vec AICouncilModelResponse;
+    consensus: opt AICouncilConsensus;
+    created_at: nat64;
+    completed_at: opt nat64;
+    total_tokens_used: nat32;
+    total_cost_usd: float64;
+};
+
+// Subscription types
+type SubscriptionPlan = variant {
+    Demo;
+    Monthly;
+    Yearly;
+    Lifetime;
+    NFTHolder;
+};
+
+type Subscription = record {
+    user: principal;
+    plan: SubscriptionPlan;
+    started_at: nat64;
+    expires_at: opt nat64;
+    is_active: bool;
+    payment_history: vec text;
+};
+
+// Notification types
+type NotificationType = variant {
+    MorningGreeting;
+    MiddayUpdate;
+    EveningMessage;
+    AdminAnnouncement;
+    SystemAlert;
+    InterAgentMessage;
+};
+
+type RavenNotification = record {
+    id: nat32;
+    notification_type: NotificationType;
+    title: text;
+    message: text;
+    sender: text;
+    created_at: nat64;
+    scheduled_for: opt nat64;
+    sent: bool;
+    sent_at: opt nat64;
+    recipients: vec nat32;
+};
+
+// Shared memory for inter-agent learning
+type SharedMemory = record {
+    id: text;
+    source_agent: nat32;
+    memory_type: text;
+    content: text;
+    importance: float32;
+    created_at: nat64;
+    access_count: nat64;
+    tags: vec text;
+};
+
+service : {
+    // Query Functions
+    get_config: () -> (Config) query;
+    get_token_prices_info: () -> (vec TokenPrice) query;
+    get_axiom_availability: () -> (nat32, nat32, vec nat32) query;
+    get_agent: (nat64) -> (opt RavenAIAgent) query;
+    get_axiom: (nat32) -> (opt AxiomNFT) query;
+    get_agents_by_owner: (principal) -> (vec RavenAIAgent) query;
+    get_payment: (text) -> (opt PaymentRecord) query;
+    get_total_supply: () -> (nat64, nat32) query;
+    get_btc_address: () -> (text) query;
+    health: () -> (text) query;
+    
+    // Memory Functions
+    add_memory: (nat64, text, text, float32, vec text) -> (variant { Ok: text; Err: text });
+    upload_axiom_document: (nat64, text, vec nat8, text) -> (variant { Ok: text; Err: text });
+    add_chat_message: (nat64, text, text) -> (variant { Ok; Err: text });
+    update_agent_config: (nat64, AgentConfig) -> (variant { Ok; Err: text });
+    get_conversation_history: (nat64, nat32) -> (vec ChatMessage) query;
+    recall_memories: (nat64, text, nat32) -> (vec MemoryEntry) query;
+    
+    // AI Council & Chat Functions (uses HTTP outcalls)
+    query_ai_council: (text, opt text, vec ChatMessage, opt nat64) -> (variant { Ok: AICouncilSession; Err: text });
+    chat: (opt nat64, text, opt text) -> (variant { Ok: text; Err: text });
+    get_council_session: (text) -> (opt AICouncilSession) query;
+    get_user_council_sessions: (principal, nat32) -> (vec AICouncilSession) query;
+    
+    // Voice Synthesis (proxied via HTTP outcalls to Eleven Labs)
+    synthesize_voice: (VoiceSynthesisRequest) -> (variant { Ok: VoiceSynthesisResponse; Err: text });
+    
+    // Subscription Functions
+    check_subscription: (principal) -> (opt Subscription) query;
+    start_demo: () -> (variant { Ok: Subscription; Err: text });
+    get_subscription_pricing: () -> (vec record { text; nat64 }) query;
+    purchase_subscription: (text, text) -> (variant { Ok: Subscription; Err: text });
+    renew_subscription: (text) -> (variant { Ok: Subscription; Err: text });
+    
+    // Payment & Minting
+    initiate_payment: (PaymentToken, text, opt nat32) -> (variant { Ok: PaymentRecord; Err: text });
+    confirm_payment: (text, text) -> (variant { Ok: RavenAIAgent; Err: text });
+    airdrop_axiom: (nat32, principal) -> (variant { Ok: RavenAIAgent; Err: text });
+    
+    // Transfer Functions
+    transfer_agent: (nat64, principal) -> (variant { Ok; Err: text });
+    update_multichain_address: (nat64, text, text) -> (variant { Ok; Err: text });
+    
+    // Admin Functions
+    admin_pause: (bool) -> (variant { Ok; Err: text });
+    admin_add_principal: (principal) -> (variant { Ok; Err: text });
+    admin_set_llm_api_key: (text, text) -> (variant { Ok; Err: text });
+    get_llm_providers: () -> (vec record { text; bool }) query;
+    
+    // Notification System
+    init_notification_system: () -> (variant { Ok: nat32; Err: text });
+    admin_send_notification: (text, text, vec nat32) -> (variant { Ok: RavenNotification; Err: text });
+    get_scheduled_notifications: (text) -> (vec RavenNotification) query;
+    get_pending_notifications: (nat32) -> (vec RavenNotification) query;
+    process_scheduled_notifications: () -> (variant { Ok: nat32; Err: text });
+    admin_get_all_notifications: (nat32, nat32) -> (vec RavenNotification) query;
+    mark_notification_read: (nat32, nat32) -> (variant { Ok; Err: text });
+    
+    // Inter-Agent Communication
+    share_memory_to_collective: (nat32, text, text, float32, vec text) -> (variant { Ok: text; Err: text });
+    query_shared_memories: (text, nat32) -> (vec SharedMemory) query;
+    sync_agent_learnings: (nat32) -> (variant { Ok: nat32; Err: text });
+    get_collective_stats: () -> (nat64, nat64, nat64) query;
+    send_inter_agent_message: (nat32, nat32, text) -> (variant { Ok; Err: text });
+    
+    // AXIOM NFT Minting Orchestrator
+    mint_axiom_agent: (PaymentToken, nat64, text) -> (variant { Ok: MintResult; Err: text });
+    top_up_axiom_cycles: (principal, PaymentToken, nat64, text) -> (variant { Ok: nat; Err: text });
+    
+    // Raven News AI Pipeline
+    generate_daily_article: (ArticlePersona, opt text) -> (variant { Ok: NewsArticle; Err: text });
+    trigger_article_generation: (ArticlePersona, opt text) -> (variant { Ok: NewsArticle; Err: text });
+    create_article: (text, text, text, text, ArticlePersona, text, vec text, text, text, vec text, bool) -> (variant { Ok: NewsArticle; Err: text });
+    get_articles: (nat32, nat32) -> (vec NewsArticle) query;
+    get_article: (nat64) -> (opt NewsArticle) query;
+    increment_article_views: (nat64) -> (variant { Ok: nat64; Err: text });
+    like_article: (nat64) -> (variant { Ok: nat64; Err: text });
+    share_article: (nat64) -> (variant { Ok: nat64; Err: text });
+    distribute_article_harlee_rewards: (nat64, principal, nat64) -> (variant { Ok: nat64; Err: text });
+    add_article_comment: (nat64, text) -> (variant { Ok: ArticleComment; Err: text });
+    get_article_comments: (nat64) -> (vec ArticleComment) query;
+    like_comment: (nat64) -> (variant { Ok: nat64; Err: text });
+};
+
+
+

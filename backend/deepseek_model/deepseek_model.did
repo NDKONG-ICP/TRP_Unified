@@ -1,0 +1,51 @@
+// DeepSeek R1 7B Model Weight Sharding Canister
+// Stores and serves sharded model weights for on-chain inference
+
+type ModelShard = record {
+    shard_id: nat32;
+    shard_data: vec nat8;
+    shard_index: nat64;
+    shard_size: nat64;
+    total_shards: nat32;
+    model_hash: text;
+    quantization: opt text;  // "Q4_K_M", "Q8_0", "F16", etc. (optional for backward compatibility)
+    compression_ratio: opt float32;  // e.g., 0.25 for 4-bit (75% reduction) (optional for backward compatibility)
+};
+
+type ChatMessage = record {
+    role: text;
+    content: text;
+    timestamp: nat64;
+};
+
+type InferenceRequest = record {
+    prompt: text;
+    max_tokens: nat32;
+    temperature: float32;
+    top_p: float32;
+    context: vec ChatMessage;
+    system_prompt: opt text;
+};
+
+type InferenceResponse = record {
+    response: text;
+    tokens_generated: nat32;
+    inference_time_ms: nat64;
+    shards_used: vec nat32;
+};
+
+service : {
+    // Model Weight Management
+    store_shard: (ModelShard) -> (variant { Ok; Err: text });
+    get_shard: (nat32) -> (variant { Ok: ModelShard; Err: text }) query;
+    get_all_shard_ids: () -> (vec nat32) query;
+    get_model_info: () -> (text, nat32, nat64) query; // (model_name, total_shards, total_size)
+    
+    // On-chain Inference
+    infer: (InferenceRequest) -> (variant { Ok: InferenceResponse; Err: text });
+    infer_with_shards: (InferenceRequest, vec nat32) -> (variant { Ok: InferenceResponse; Err: text });
+    
+    // Health & Status
+    get_status: () -> (bool, nat64, nat32) query; // (ready, cycles_available, shards_loaded)
+}
+

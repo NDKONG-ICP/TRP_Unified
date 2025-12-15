@@ -1,0 +1,126 @@
+type Rarity = variant {
+    Common;
+    Uncommon;
+    Rare;
+    Epic;
+    Legendary;
+};
+
+type Trait = record {
+    trait_type: text;
+    value: text;
+    rarity_score: nat8;
+};
+
+type NFTMetadata = record {
+    name: text;
+    description: text;
+    image: text;
+    external_url: opt text;
+    attributes: vec Trait;
+    rarity: Rarity;
+    rarity_score: nat32;
+    collection: text;
+    created_at: nat64;
+    creator: principal;
+};
+
+type CollectionConfig = record {
+    name: text;
+    symbol: text;
+    description: text;
+    max_supply: nat64;
+    minted: nat64;
+    royalty_bps: nat16;
+    admin: principal;
+    paused: bool;
+};
+
+type TransferArg = record {
+    from_subaccount: opt vec nat8;
+    to: principal;
+    token_id: nat;
+    memo: opt vec nat8;
+    created_at_time: opt nat64;
+};
+
+type TransferError = variant {
+    NonExistingTokenId;
+    InvalidRecipient;
+    Unauthorized;
+    TooOld;
+    CreatedInFuture: record { ledger_time: nat64 };
+    Duplicate: record { duplicate_of: nat };
+    GenericError: record { error_code: nat; message: text };
+    GenericBatchError: record { error_code: nat; message: text };
+};
+
+type MintArgs = record {
+    to: principal;
+    name: text;
+    description: text;
+    image: text;
+    attributes: vec Trait;
+};
+
+// Controller Configuration Types
+type ControllerConfig = record {
+    admin_principals: vec principal;
+    backend_canisters: vec principal;
+    frontend_canister: opt principal;
+    auto_add_app_controllers: bool;
+    minter_retains_control: bool;
+};
+
+type NFTControllerRecord = record {
+    token_id: nat64;
+    canister_id: opt principal;
+    controllers: vec principal;
+    owner: principal;
+    created_at: nat64;
+    last_updated: nat64;
+};
+
+service : {
+    // ICRC-7 Standard
+    icrc7_collection_metadata: () -> (vec record { text; text }) query;
+    icrc7_name: () -> (text) query;
+    icrc7_symbol: () -> (text) query;
+    icrc7_total_supply: () -> (nat) query;
+    icrc7_supply_cap: () -> (opt nat) query;
+    icrc7_owner_of: (nat) -> (opt principal) query;
+    icrc7_balance_of: (principal) -> (nat) query;
+    icrc7_tokens_of: (principal) -> (vec nat) query;
+    icrc7_token_metadata: (nat) -> (opt vec record { text; text }) query;
+    
+    // ICRC-37 Transfer
+    icrc7_transfer: (vec TransferArg) -> (vec opt variant { Ok: nat; Err: TransferError });
+    icrc37_approve: (nat, principal) -> (variant { Ok; Err: TransferError });
+    
+    // Minting
+    mint: (MintArgs) -> (variant { Ok: nat; Err: text });
+    batch_mint: (vec MintArgs) -> (vec variant { Ok: nat; Err: text });
+    
+    // Admin
+    set_paused: (bool) -> (variant { Ok; Err: text });
+    update_collection_config: (text, text, text, nat16) -> (variant { Ok; Err: text });
+    
+    // Controller Management - Application canisters as controllers
+    get_controller_config: () -> (ControllerConfig) query;
+    get_nft_controllers: (nat64) -> (opt NFTControllerRecord) query;
+    set_backend_canisters: (vec principal) -> (variant { Ok; Err: text });
+    set_frontend_canister: (principal) -> (variant { Ok; Err: text });
+    add_admin_principal: (principal) -> (variant { Ok; Err: text });
+    remove_admin_principal: (principal) -> (variant { Ok; Err: text });
+    register_nft_controllers: (nat64, opt principal) -> (variant { Ok: NFTControllerRecord; Err: text });
+    update_nft_controllers: (nat64) -> (variant { Ok: NFTControllerRecord; Err: text });
+    get_all_controller_records: () -> (vec NFTControllerRecord) query;
+    is_authorized_nft_controller: (principal) -> (bool) query;
+    get_backend_controllers: () -> (vec principal) query;
+    get_admin_principals: () -> (vec principal) query;
+    
+    // Queries
+    get_collection_config: () -> (CollectionConfig) query;
+    get_nft_metadata: (nat) -> (opt NFTMetadata) query;
+    health: () -> (text) query;
+}

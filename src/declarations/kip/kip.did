@@ -1,0 +1,140 @@
+// KIP Canister - Know-Your-Identity Provider
+// User profiles, verification, and leaderboard management
+
+type VerificationStatus = variant {
+    Pending;
+    Approved;
+    Rejected;
+    Expired;
+};
+
+type DocumentType = variant {
+    DriversLicense;
+    Insurance;
+    MCNumber;
+    DOTNumber;
+    VehicleRegistration;
+    ProofOfAddress;
+    Other: text;
+};
+
+type MailingAddress = record {
+    street: opt text;
+    city: opt text;
+    state: opt text;
+    zip: opt text;
+    country: opt text;
+};
+
+type SocialLinks = record {
+    twitter: opt text;
+    instagram: opt text;
+    discord: opt text;
+    website: opt text;
+};
+
+type UserStats = record {
+    total_games_played: nat64;
+    total_harlee_earned: nat64;
+    crossword_puzzles_solved: nat64;
+    sk8_punks_high_score: nat64;
+    articles_written: nat64;
+    memes_uploaded: nat64;
+    nfts_owned: nat64;
+};
+
+type KIPProfile = record {
+    user_principal: principal;
+    username: text;
+    display_name: text;
+    bio: opt text;
+    profile_picture_url: opt text;
+    banner_url: opt text;
+    email: opt text;
+    phone: opt text;
+    address: opt text;
+    mailing_address: opt MailingAddress;
+    oisy_wallet_principal: opt principal;
+    verification_status: VerificationStatus;
+    verified_at: opt nat64;
+    created_at: nat64;
+    updated_at: nat64;
+    preferences: vec record { text; text };
+    social_links: SocialLinks;
+    newsletter_subscribed: bool;
+    stats: UserStats;
+};
+
+type Document = record {
+    id: text;
+    owner: principal;
+    doc_type: DocumentType;
+    hash: text;
+    status: VerificationStatus;
+    uploaded_at: nat64;
+    reviewed_at: opt nat64;
+    reviewer: opt principal;
+    rejection_reason: opt text;
+    expires_at: opt nat64;
+};
+
+type ProfileUpdateRequest = record {
+    display_name: opt text;
+    bio: opt text;
+    profile_picture_url: opt text;
+    banner_url: opt text;
+    email: opt text;
+    phone: opt text;
+    mailing_address: opt MailingAddress;
+    social_links: opt SocialLinks;
+    newsletter_subscribed: opt bool;
+};
+
+type ProfileResult = variant {
+    Ok: KIPProfile;
+    Err: text;
+};
+
+type StatsResult = variant {
+    Ok: UserStats;
+    Err: text;
+};
+
+type VoidResult = variant {
+    Ok;
+    Err: text;
+};
+
+service : {
+    // Profile Management
+    create_profile: (text, text, opt text) -> (ProfileResult);
+    get_profile: (principal) -> (opt KIPProfile) query;
+    get_my_profile: () -> (opt KIPProfile) query;
+    update_profile: (opt text, opt text, opt text, opt text) -> (ProfileResult);
+    update_profile_v2: (ProfileUpdateRequest) -> (ProfileResult);
+    
+    // Username
+    is_username_available: (text) -> (bool) query;
+    get_profile_by_username: (text) -> (opt KIPProfile) query;
+    
+    // Document Management
+    upload_document: (DocumentType, text) -> (variant { Ok: Document; Err: text });
+    get_my_documents: () -> (vec Document) query;
+    get_document: (text) -> (opt Document) query;
+    
+    // Admin: Document Review
+    review_document: (text, VerificationStatus, opt text) -> (variant { Ok: Document; Err: text });
+    get_pending_documents: () -> (vec Document) query;
+    
+    // Leaderboards
+    get_leaderboard: (text, nat64) -> (vec record { KIPProfile; nat64 }) query;
+    update_user_stats: (principal, opt nat64, opt nat64, opt nat64, opt nat64, opt nat64, opt nat64, opt nat64) -> (StatsResult);
+    
+    // Newsletter
+    subscribe_newsletter: (text, opt MailingAddress) -> (VoidResult);
+    
+    // Admin
+    set_admin: (principal) -> ();
+    get_all_profiles: () -> (vec KIPProfile) query;
+    get_stats: () -> (record { total_profiles: nat64; verified_profiles: nat64; pending_docs: nat64 }) query;
+}
