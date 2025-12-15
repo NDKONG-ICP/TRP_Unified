@@ -40,9 +40,10 @@ const ADMIN_PRINCIPAL_OISY: &str = "yyirv-5pjkg-oupac-gzja4-ljzfn-6mvon-r5w2i-6e
 const ADMIN_PRINCIPAL_NEW: &str = "imnyd-k37s2-xlg7c-omeed-ezrzg-6oesa-r3ek6-xrwuz-qbliq-5h675-yae";
 
 // LLM API Keys (loaded from init)
-const HUGGINGFACE_API_KEY: &str = "REMOVED_API_KEY
-const PERPLEXITY_API_KEY: &str = "REMOVED_API_KEY
-const ELEVEN_LABS_API_KEY: &str = "REMOVED_API_KEY";
+// NOTE: These are placeholders - set via canister initialization in production
+const HUGGINGFACE_API_KEY: &str = env!("HUGGINGFACE_API_KEY");
+const PERPLEXITY_API_KEY: &str = env!("PERPLEXITY_API_KEY");
+const ELEVEN_LABS_API_KEY: &str = env!("ELEVEN_LABS_API_KEY");
 const ELEVEN_LABS_VOICE_ID: &str = "kPzsL2i3teMYv0FxEYQ6";
 
 // ============ TYPES ============

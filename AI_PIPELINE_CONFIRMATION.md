@@ -177,10 +177,11 @@ User Message → AXIOM NFT Frontend → POST /api/chat → http_update()
 - ✅ All API keys stored in backend canisters (not exposed to frontend)
 - ✅ CORS issues avoided (backend makes calls, not browser)
 - ✅ API keys:
-  - Hugging Face: `REMOVED_API_KEY
-  - Perplexity: `REMOVED_API_KEY
-  - Eleven Labs: `REMOVED_API_KEY`
-  - Eleven Labs Voice ID: `kPzsL2i3teMYv0FxEYQ6`
+  - Hugging Face: Set via `HUGGINGFACE_API_KEY` environment variable
+  - Perplexity: Set via `PERPLEXITY_API_KEY` environment variable
+  - Eleven Labs: Set via `ELEVEN_LABS_API_KEY` environment variable
+  - Eleven Labs Voice ID: Set via `ELEVEN_LABS_VOICE_ID` environment variable
+  - **Note**: Never commit actual API keys to version control. Use environment variables or secure storage.
 
 ---
 

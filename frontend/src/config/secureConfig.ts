@@ -15,14 +15,17 @@
 // Note: In production, these should be proxied through backend canister for security
 export const API_KEYS = {
   // Eleven Labs - for voice synthesis
-  ELEVEN_LABS: import.meta.env.VITE_ELEVEN_LABS_API_KEY || 'REMOVED_API_KEY',
+  // NOTE: Set via environment variable VITE_ELEVEN_LABS_API_KEY
+  ELEVEN_LABS: import.meta.env.VITE_ELEVEN_LABS_API_KEY || '',
   ELEVEN_LABS_VOICE_ID: import.meta.env.VITE_ELEVEN_LABS_VOICE_ID || 'kPzsL2i3teMYv0FxEYQ6',
   
   // Hugging Face - for AI Council
-  HUGGING_FACE: import.meta.env.VITE_HUGGING_FACE_API_KEY || 'REMOVED_API_KEY
+  // NOTE: Set via environment variable VITE_HUGGING_FACE_API_KEY
+  HUGGING_FACE: import.meta.env.VITE_HUGGING_FACE_API_KEY || '',
   
   // Perplexity - for real-time search AI
-  PERPLEXITY: import.meta.env.VITE_PERPLEXITY_API_KEY || 'REMOVED_API_KEY
+  // NOTE: Set via environment variable VITE_PERPLEXITY_API_KEY
+  PERPLEXITY: import.meta.env.VITE_PERPLEXITY_API_KEY || '',
 };
 
 // Check if keys are configured (for development warnings)

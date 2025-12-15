@@ -313,7 +313,8 @@ async fn call_deepseek_r1_api(
     // Q4_K_M quantization reduces model size from ~14GB to ~4GB
     // This allows faster inference and fits within IC instruction limits
     const DEEPSEEK_API_URL: &str = "https://api-inference.huggingface.co/models/deepseek-ai/DeepSeek-R1-Distill-Qwen-7B";
-    const HF_API_KEY: &str = "REMOVED_API_KEY
+    // NOTE: Set via environment variable or canister initialization
+    const HF_API_KEY: &str = env!("HUGGINGFACE_API_KEY");
     
     // Limit prompt length to prevent instruction limit issues
     // IC has ~20M instructions per message execution

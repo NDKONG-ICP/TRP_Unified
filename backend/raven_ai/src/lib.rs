@@ -37,9 +37,10 @@ const RAVEN_TOKEN_CANISTER: &str = "ryjl3-tyaaa-aaaaa-aaaba-cai"; // Update with
 const ADMIN_PRINCIPAL: &str = "lgd5r-y4x7q-lbrfa-mabgw-xurgu-4h3at-sw4sl-yyr3k-5kwgt-vlkao-jae";
 
 // API Keys (should be loaded from init/stable storage in production)
-const HUGGINGFACE_API_KEY: &str = "REMOVED_API_KEY
-const PERPLEXITY_API_KEY: &str = "REMOVED_API_KEY
-const ELEVEN_LABS_API_KEY: &str = "REMOVED_API_KEY";
+// NOTE: These are placeholders - set via canister initialization in production
+const HUGGINGFACE_API_KEY: &str = env!("HUGGINGFACE_API_KEY");
+const PERPLEXITY_API_KEY: &str = env!("PERPLEXITY_API_KEY");
+const ELEVEN_LABS_API_KEY: &str = env!("ELEVEN_LABS_API_KEY");
 
 // ============ TYPE DEFINITIONS ============
 

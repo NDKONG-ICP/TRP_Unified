@@ -75,7 +75,7 @@ interface VoteSummary {
 // ============================================================================
 
 const CONFIG: AICouncilConfig = {
-  apiKey: 'REMOVED_API_KEY
+  apiKey: process.env.HUGGINGFACE_API_KEY || '', // Set via environment variable
   maxNewTokens: 512,
   temperature: 0.7,
   topP: 0.95,
