@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::borrow::Cow;
 use std::cell::RefCell;
+use std::convert::TryInto;
 
 type Memory = VirtualMemory<DefaultMemoryImpl>;
 
@@ -17,6 +18,226 @@ const PROFILES_MEM_ID: MemoryId = MemoryId::new(0);
 const DOCUMENTS_MEM_ID: MemoryId = MemoryId::new(1);
 const CONFIG_MEM_ID: MemoryId = MemoryId::new(2);
 const VERIFICATIONS_MEM_ID: MemoryId = MemoryId::new(3);
+const LINKED_WALLETS_MEM_ID: MemoryId = MemoryId::new(4);
+const PENDING_LINKS_MEM_ID: MemoryId = MemoryId::new(5);
+
+// =========================
+// Linked wallets (Phantom/Sui)
+// =========================
+
+#[derive(CandidType, Serialize, Deserialize, Clone, Debug, Default)]
+pub struct LinkedWallets {
+    pub solana_pubkeys: Vec<String>,
+    // Note: current SIS implementation treats `address` as a 32-byte pubkey (hex/base58).
+    pub sui_addresses: Vec<String>,
+    pub evm_addresses: Vec<String>,
+}
+
+impl Storable for LinkedWallets {
+    fn to_bytes(&self) -> Cow<[u8]> {
+        Cow::Owned(Encode!(self).unwrap())
+    }
+
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        Decode!(bytes.as_ref(), Self).unwrap()
+    }
+
+    const BOUND: ic_stable_structures::storable::Bound = ic_stable_structures::storable::Bound::Unbounded;
+}
+
+#[derive(CandidType, Deserialize, Serialize, Clone, Debug)]
+pub struct SIWSMessage {
+    pub domain: String,
+    pub address: String,
+    pub statement: Option<String>,
+    pub uri: String,
+    pub version: String,
+    pub chain_id: String,
+    pub nonce: String,
+    pub issued_at: String,
+    pub expiration_time: Option<String>,
+    pub not_before: Option<String>,
+    pub request_id: Option<String>,
+    pub resources: Option<Vec<String>>,
+}
+
+#[derive(CandidType, Deserialize, Serialize, Clone, Debug)]
+pub struct SISMessage {
+    pub domain: String,
+    pub address: String,
+    pub statement: Option<String>,
+    pub uri: String,
+    pub version: String,
+    pub chain_id: String,
+    pub nonce: String,
+    pub issued_at: String,
+    pub expiration_time: Option<String>,
+    pub not_before: Option<String>,
+    pub request_id: Option<String>,
+    pub resources: Option<Vec<String>>,
+}
+
+#[derive(CandidType, Deserialize, Serialize, Clone, Debug)]
+pub enum LinkPayload {
+    Solana(SIWSMessage),
+    Sui(SISMessage),
+}
+
+#[derive(CandidType, Deserialize, Serialize, Clone, Debug)]
+pub struct WalletLinkChallenge {
+    pub kind: String, // "phantom" | "sui"
+    pub issued_at: u64,
+    pub expires_at: u64,
+    pub payload: LinkPayload,
+}
+
+impl Storable for WalletLinkChallenge {
+    fn to_bytes(&self) -> Cow<[u8]> {
+        Cow::Owned(Encode!(self).unwrap())
+    }
+
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        Decode!(bytes.as_ref(), Self).unwrap()
+    }
+
+    const BOUND: ic_stable_structures::storable::Bound = ic_stable_structures::storable::Bound::Unbounded;
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, CandidType, Serialize, Deserialize)]
+struct LinkKey {
+    principal: Principal,
+    kind: String,
+}
+
+impl Storable for LinkKey {
+    fn to_bytes(&self) -> Cow<[u8]> {
+        Cow::Owned(Encode!(self).unwrap())
+    }
+
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        Decode!(bytes.as_ref(), Self).unwrap()
+    }
+
+    const BOUND: ic_stable_structures::storable::Bound = ic_stable_structures::storable::Bound::Unbounded;
+}
+
+#[derive(CandidType, Deserialize, Serialize)]
+pub enum WalletLinkResult {
+    Ok(WalletLinkChallenge),
+    Err(String),
+}
+
+fn format_siws_message(msg: &SIWSMessage) -> String {
+    let mut message = format!(
+        "{} wants you to sign in with your Solana account:\n",
+        msg.domain
+    );
+    message.push_str(&format!("{}\n\n", msg.address));
+    if let Some(ref statement) = msg.statement {
+        message.push_str(&format!("{}\n\n", statement));
+    }
+    message.push_str(&format!("URI: {}\n", msg.uri));
+    message.push_str(&format!("Version: {}\n", msg.version));
+    message.push_str(&format!("Chain ID: {}\n", msg.chain_id));
+    message.push_str(&format!("Nonce: {}\n", msg.nonce));
+    message.push_str(&format!("Issued At: {}", msg.issued_at));
+    if let Some(ref expiration) = msg.expiration_time {
+        message.push_str(&format!("\nExpiration Time: {}", expiration));
+    }
+    if let Some(ref not_before) = msg.not_before {
+        message.push_str(&format!("\nNot Before: {}", not_before));
+    }
+    if let Some(ref request_id) = msg.request_id {
+        message.push_str(&format!("\nRequest ID: {}", request_id));
+    }
+    if let Some(ref resources) = msg.resources {
+        message.push_str("\nResources:");
+        for resource in resources {
+            message.push_str(&format!("\n- {}", resource));
+        }
+    }
+    message
+}
+
+fn format_sis_message(msg: &SISMessage) -> String {
+    let mut message =
+        format!("{} wants you to sign in with your Sui account:\n", msg.domain);
+    message.push_str(&format!("{}\n\n", msg.address));
+    if let Some(ref statement) = msg.statement {
+        message.push_str(&format!("{}\n\n", statement));
+    }
+    message.push_str(&format!("URI: {}\n", msg.uri));
+    message.push_str(&format!("Version: {}\n", msg.version));
+    message.push_str(&format!("Chain ID: {}\n", msg.chain_id));
+    message.push_str(&format!("Nonce: {}\n", msg.nonce));
+    message.push_str(&format!("Issued At: {}", msg.issued_at));
+    if let Some(ref expiration) = msg.expiration_time {
+        message.push_str(&format!("\nExpiration Time: {}", expiration));
+    }
+    if let Some(ref not_before) = msg.not_before {
+        message.push_str(&format!("\nNot Before: {}", not_before));
+    }
+    if let Some(ref request_id) = msg.request_id {
+        message.push_str(&format!("\nRequest ID: {}", request_id));
+    }
+    if let Some(ref resources) = msg.resources {
+        message.push_str("\nResources:");
+        for resource in resources {
+            message.push_str(&format!("\n- {}", resource));
+        }
+    }
+    message
+}
+
+use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+
+fn decode_sig(signature: &str) -> Option<Vec<u8>> {
+    if signature.starts_with("0x") {
+        hex::decode(&signature[2..]).ok()
+    } else {
+        bs58::decode(signature).into_vec().ok()
+    }
+}
+
+fn decode_addr(address: &str) -> Option<Vec<u8>> {
+    if address.starts_with("0x") {
+        hex::decode(&address[2..]).ok()
+    } else {
+        bs58::decode(address).into_vec().ok()
+    }
+}
+
+fn verify_ed25519(message: &str, signature: &str, pubkey_text: &str) -> bool {
+    let sig_bytes = match decode_sig(signature) {
+        Some(b) => b,
+        None => return false,
+    };
+    let pk_bytes = match decode_addr(pubkey_text) {
+        Some(b) => b,
+        None => return false,
+    };
+
+    if sig_bytes.len() != 64 || pk_bytes.len() != 32 {
+        return false;
+    }
+
+    let public_key = match VerifyingKey::from_bytes(&pk_bytes.try_into().unwrap()) {
+        Ok(pk) => pk,
+        Err(_) => return false,
+    };
+
+    let signature_obj = Signature::from_bytes(&sig_bytes.try_into().unwrap());
+
+    public_key.verify(message.as_bytes(), &signature_obj).is_ok()
+}
+
+fn nonce_hex(caller: Principal, kind: &str, issued_at: u64) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(caller.as_slice());
+    hasher.update(kind.as_bytes());
+    hasher.update(issued_at.to_le_bytes());
+    hex::encode(hasher.finalize())[..32].to_string()
+}
 
 // Verification status
 #[derive(CandidType, Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -233,14 +454,22 @@ thread_local! {
             MEMORY_MANAGER.with(|m| m.borrow().get(CONFIG_MEM_ID)),
             KIPConfig::default()
         ).unwrap());
+
+    static LINKED_WALLETS: RefCell<StableBTreeMap<StorablePrincipal, LinkedWallets, Memory>> =
+        RefCell::new(StableBTreeMap::init(
+            MEMORY_MANAGER.with(|m| m.borrow().get(LINKED_WALLETS_MEM_ID))
+        ));
+
+    static PENDING_LINKS: RefCell<StableBTreeMap<LinkKey, WalletLinkChallenge, Memory>> =
+        RefCell::new(StableBTreeMap::init(
+            MEMORY_MANAGER.with(|m| m.borrow().get(PENDING_LINKS_MEM_ID))
+        ));
 }
 
 // Admin principal
-const ADMIN_PRINCIPAL: &str = "lgd5r-y4x7q-lbrfa-mabgw-xurgu-4h3at-sw4sl-yyr3k-5kwgt-vlkao-jae";
-
 fn is_admin(caller: Principal) -> bool {
     CONFIG.with(|c| c.borrow().get().admin == caller)
-        || caller.to_text() == ADMIN_PRINCIPAL
+        || ic_cdk::api::is_controller(&caller)
 }
 
 fn generate_doc_id(owner: Principal, doc_type: &DocumentType) -> String {
@@ -251,18 +480,13 @@ fn generate_doc_id(owner: Principal, doc_type: &DocumentType) -> String {
     hex::encode(hasher.finalize())[..16].to_string()
 }
 
-// Initialization
 #[init]
 fn init() {
     let caller = ic_cdk::caller();
     
     CONFIG.with(|c| {
         let mut config = c.borrow().get().clone();
-        config.admin = if caller != Principal::anonymous() {
-            caller
-        } else {
-            Principal::from_text(ADMIN_PRINCIPAL).unwrap()
-        };
+        config.admin = caller;
         c.borrow_mut().set(config).unwrap();
     });
 }
@@ -841,6 +1065,197 @@ fn is_verified(principal: Principal) -> bool {
 #[query]
 fn health() -> String {
     "OK".to_string()
+}
+
+// =========================
+// Linked wallets (Phantom/Sui)
+// =========================
+
+#[update]
+fn start_link_wallet(kind: String) -> WalletLinkResult {
+    let caller = ic_cdk::caller();
+    if caller == Principal::anonymous() {
+        return WalletLinkResult::Err("Anonymous principals cannot link wallets".to_string());
+    }
+
+    let kind_norm = kind.to_lowercase();
+    if kind_norm != "phantom" && kind_norm != "sui" {
+        return WalletLinkResult::Err("Unsupported kind. Use 'phantom' or 'sui'.".to_string());
+    }
+
+    let now = ic_cdk::api::time();
+    let ttl_ns: u64 = 10 * 60 * 1_000_000_000; // 10 minutes
+    let expires_at = now.saturating_add(ttl_ns);
+    let nonce = nonce_hex(caller, &kind_norm, now);
+
+    let domain = "raven-ecosystem".to_string();
+    let uri = "https://raven-unified-ecosystem.ic0.app".to_string();
+
+    let statement = Some(format!(
+        "Link this wallet to ICP principal: {}",
+        caller.to_text()
+    ));
+
+    let payload = if kind_norm == "phantom" {
+        LinkPayload::Solana(SIWSMessage {
+            domain,
+            address: "".to_string(), // frontend fills wallet pubkey
+            statement,
+            uri,
+            version: "1".to_string(),
+            chain_id: "mainnet-beta".to_string(),
+            nonce,
+            issued_at: now.to_string(),
+            expiration_time: None,
+            not_before: None,
+            request_id: None,
+            resources: None,
+        })
+    } else {
+        LinkPayload::Sui(SISMessage {
+            domain,
+            address: "".to_string(), // frontend fills wallet pubkey (see sis_canister)
+            statement,
+            uri,
+            version: "1".to_string(),
+            chain_id: "mainnet".to_string(),
+            nonce,
+            issued_at: now.to_string(),
+            expiration_time: None,
+            not_before: None,
+            request_id: None,
+            resources: None,
+        })
+    };
+
+    let challenge = WalletLinkChallenge {
+        kind: kind_norm.clone(),
+        issued_at: now,
+        expires_at,
+        payload,
+    };
+
+    PENDING_LINKS.with(|p| {
+        p.borrow_mut().insert(
+            LinkKey {
+                principal: caller,
+                kind: kind_norm,
+            },
+            challenge.clone(),
+        );
+    });
+
+    WalletLinkResult::Ok(challenge)
+}
+
+#[update]
+fn confirm_link_wallet(payload: LinkPayload, signature: String) -> Result<(), String> {
+    let caller = ic_cdk::caller();
+    if caller == Principal::anonymous() {
+        return Err("Anonymous principals cannot link wallets".to_string());
+    }
+
+    let (kind, address, formatted_message, nonce) = match &payload {
+        LinkPayload::Solana(msg) => {
+            let kind = "phantom".to_string();
+            let formatted = format_siws_message(msg);
+            (kind, msg.address.clone(), formatted, msg.nonce.clone())
+        }
+        LinkPayload::Sui(msg) => {
+            let kind = "sui".to_string();
+            let formatted = format_sis_message(msg);
+            (kind, msg.address.clone(), formatted, msg.nonce.clone())
+        }
+    };
+
+    let pending = PENDING_LINKS.with(|p| {
+        p.borrow()
+            .get(&LinkKey {
+                principal: caller,
+                kind: kind.clone(),
+            })
+    });
+
+    let pending = match pending {
+        Some(p) => p,
+        None => return Err("No pending link challenge. Call start_link_wallet first.".to_string()),
+    };
+
+    if ic_cdk::api::time() > pending.expires_at {
+        return Err("Challenge expired. Please start again.".to_string());
+    }
+
+    // Ensure caller-bound nonce matches (prevents replay across principals/kinds)
+    let expected_nonce = nonce_hex(caller, &kind, pending.issued_at);
+    if nonce != expected_nonce {
+        return Err("Nonce mismatch. Please start again.".to_string());
+    }
+
+    if address.is_empty() {
+        return Err("Missing address/public key in payload.".to_string());
+    }
+
+    // Ensure the signed statement is caller-bound (defense in depth)
+    let caller_text = caller.to_text();
+    match &payload {
+        LinkPayload::Solana(msg) => {
+            if msg.statement.as_ref().map(|s| s.contains(&caller_text)) != Some(true) {
+                return Err("Challenge statement mismatch. Please start again.".to_string());
+            }
+        }
+        LinkPayload::Sui(msg) => {
+            if msg.statement.as_ref().map(|s| s.contains(&caller_text)) != Some(true) {
+                return Err("Challenge statement mismatch. Please start again.".to_string());
+            }
+        }
+    }
+
+    // Verify signature locally (same behavior as sis/siws canisters: signature in base58 or 0x hex)
+    let ok = verify_ed25519(&formatted_message, &signature, &address);
+    if !ok {
+        return Err("Invalid signature".to_string());
+    }
+
+    // Store linked wallet under caller principal
+    LINKED_WALLETS.with(|lw| {
+        let mut map = lw.borrow_mut();
+        let key = StorablePrincipal(caller);
+        let mut current = map.get(&key).unwrap_or_default();
+        if kind == "phantom" {
+            if !current.solana_pubkeys.iter().any(|a| a == &address) {
+                current.solana_pubkeys.push(address);
+            }
+        } else if kind == "sui" {
+            if !current.sui_addresses.iter().any(|a| a == &address) {
+                current.sui_addresses.push(address);
+            }
+        }
+        map.insert(key, current);
+    });
+
+    // Clear pending
+    PENDING_LINKS.with(|p| {
+        p.borrow_mut().remove(&LinkKey {
+            principal: caller,
+            kind,
+        });
+    });
+
+    Ok(())
+}
+
+#[query]
+fn get_linked_wallets(principal: Principal) -> Option<LinkedWallets> {
+    LINKED_WALLETS.with(|lw| lw.borrow().get(&StorablePrincipal(principal)))
+}
+
+#[query]
+fn get_my_linked_wallets() -> Option<LinkedWallets> {
+    let caller = ic_cdk::caller();
+    if caller == Principal::anonymous() {
+        return None;
+    }
+    LINKED_WALLETS.with(|lw| lw.borrow().get(&StorablePrincipal(caller)))
 }
 
 // Generate Candid

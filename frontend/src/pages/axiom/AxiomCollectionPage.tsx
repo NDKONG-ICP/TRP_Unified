@@ -555,7 +555,8 @@ export const AxiomCollectionPage: React.FC = () => {
                           </div>
                           <h3 className="text-white font-bold">Ethereum</h3>
                           <span className="px-2 py-1 bg-blue-500/20 text-blue-400 text-xs rounded">ERC-721</span>
-                          {multichainData[showMultichainModal]?.evmChainId && (
+                          {multichainData[showMultichainModal]?.evmChainId !== undefined &&
+                            multichainData[showMultichainModal]?.evmChainId !== 0n && (
                             <span className="px-2 py-1 bg-gray-500/20 text-gray-400 text-xs rounded">
                               Chain ID: {String(multichainData[showMultichainModal]?.evmChainId)}
                             </span>

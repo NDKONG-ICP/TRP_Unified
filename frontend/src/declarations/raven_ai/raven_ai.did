@@ -149,6 +149,7 @@ type NewsArticle = record {
     excerpt: text;
     content: text;
     author_persona: ArticlePersona;
+    author_principal: opt principal;
     category: text;
     tags: vec text;
     seo_title: text;
@@ -191,6 +192,52 @@ type VoiceSynthesisRequest = record {
 type VoiceSynthesisResponse = record {
     audio_data: vec nat8;
     content_type: text;
+};
+
+// HALO document processing types
+type CitationFormat = variant {
+    MLA;
+    APA;
+    Chicago;
+    Harvard;
+    IEEE;
+};
+
+type PlagiarismMatch = record {
+    source_url: text;
+    matched_text: text;
+    similarity_score: float32;
+    source_title: opt text;
+    author: opt text;
+    publish_date: opt text;
+};
+
+type PlagiarismCheckResult = record {
+    is_plagiarized: bool;
+    plagiarism_percentage: float32;
+    matches: vec PlagiarismMatch;
+};
+
+type GrammarSuggestion = record {
+    text: text;
+    suggestion: text;
+    suggestion_type: text;
+};
+
+type HALOOptions = record {
+    rewrite: bool;
+    generate_citations: bool;
+    check_plagiarism: bool;
+    grammar_check: bool;
+};
+
+type HALOResult = record {
+    original_text: text;
+    formatted_text: text;
+    works_cited: vec text;
+    citations_added: nat32;
+    plagiarism_check: opt PlagiarismCheckResult;
+    grammar_suggestions: vec GrammarSuggestion;
 };
 
 // AI Council types
@@ -279,6 +326,34 @@ type SharedMemory = record {
     tags: vec text;
 };
 
+type PuzzleDifficulty = variant {
+    Easy;
+    Medium;
+    Hard;
+};
+
+type CrosswordClue = record {
+    number: nat32;
+    direction: text;
+    clue: text;
+    answer: text;
+    difficulty: PuzzleDifficulty;
+};
+
+type CrosswordPuzzle = record {
+    id: text;
+    title: text;
+    theme: text;
+    grid_size: nat32;
+    clues: vec CrosswordClue;
+    answers: vec record { nat32; nat32; text };
+    difficulty: PuzzleDifficulty;
+    ai_generated: bool;
+    created_at: nat64;
+    rewards_harlee: nat64;
+    rewards_xp: nat32;
+};
+
 service : {
     // Query Functions
     get_config: () -> (Config) query;
@@ -308,6 +383,9 @@ service : {
     
     // Voice Synthesis (proxied via HTTP outcalls to Eleven Labs)
     synthesize_voice: (VoiceSynthesisRequest) -> (variant { Ok: VoiceSynthesisResponse; Err: text });
+
+    // HALO document processing
+    process_halo_document: (vec nat8, text, CitationFormat, HALOOptions) -> (variant { Ok: HALOResult; Err: text });
     
     // Subscription Functions
     check_subscription: (principal) -> (opt Subscription) query;
@@ -329,6 +407,8 @@ service : {
     admin_pause: (bool) -> (variant { Ok; Err: text });
     admin_add_principal: (principal) -> (variant { Ok; Err: text });
     admin_set_llm_api_key: (text, text) -> (variant { Ok; Err: text });
+    admin_set_eleven_labs_api_key: (text) -> (variant { Ok; Err: text });
+    admin_upload_axiom_wasm: (vec nat8) -> (variant { Ok; Err: text });
     get_llm_providers: () -> (vec record { text; bool }) query;
     
     // Notification System
@@ -354,6 +434,7 @@ service : {
     // Raven News AI Pipeline
     generate_daily_article: (ArticlePersona, opt text) -> (variant { Ok: NewsArticle; Err: text });
     trigger_article_generation: (ArticlePersona, opt text) -> (variant { Ok: NewsArticle; Err: text });
+    regenerate_article: (nat64, opt ArticlePersona, opt text) -> (variant { Ok: NewsArticle; Err: text });
     create_article: (text, text, text, text, ArticlePersona, text, vec text, text, text, vec text, bool) -> (variant { Ok: NewsArticle; Err: text });
     get_articles: (nat32, nat32) -> (vec NewsArticle) query;
     get_article: (nat64) -> (opt NewsArticle) query;
@@ -364,6 +445,12 @@ service : {
     add_article_comment: (nat64, text) -> (variant { Ok: ArticleComment; Err: text });
     get_article_comments: (nat64) -> (vec ArticleComment) query;
     like_comment: (nat64) -> (variant { Ok: nat64; Err: text });
+
+    // Crossword Quest Functions
+    generate_crossword_puzzle: (text, PuzzleDifficulty) -> (variant { Ok: CrosswordPuzzle; Err: text });
+    get_crossword_puzzle: (text) -> (opt CrosswordPuzzle) query;
+    verify_crossword_solution: (text, vec record { nat32; nat32; text }) -> (variant { Ok: record { bool; nat64; nat32 }; Err: text });
+    get_recent_crossword_puzzles: (nat32) -> (vec CrosswordPuzzle) query;
 };
 
 

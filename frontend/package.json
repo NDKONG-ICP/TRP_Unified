@@ -19,6 +19,8 @@
     "@dfinity/ledger-icp": "^8.0.1",
     "@dfinity/ledger-icrc": "^6.0.1",
     "@dfinity/principal": "^2.0.0",
+    "@dfinity/utils": "^4.0.0",
+    "@ic-pay/icpay-widget": "^1.2.61",
     "@icp-sdk/core": "^4.2.3",
     "@mysten/wallet-kit": "^0.8.6",
     "@nfid/identitykit": "^1.0.15",

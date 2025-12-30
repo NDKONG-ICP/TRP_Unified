@@ -7,7 +7,8 @@ import { Actor, HttpAgent, Identity } from '@dfinity/agent';
 import { Principal } from '@dfinity/principal';
 import { getCanisterId, getICHost, isMainnet } from './canisterConfig';
 // Import generated TypeScript declarations and IDL factory
-import { idlFactory, _SERVICE as NFTCanisterService, NFTMetadata as BackendNFTMetadata, CollectionConfig as BackendCollectionConfig, Rarity as BackendRarity } from '../declarations/nft';
+import { idlFactory } from '../declarations/nft';
+import type { _SERVICE as NFTCanisterService, NFTMetadata as BackendNFTMetadata, CollectionConfig as BackendCollectionConfig, Rarity as BackendRarity } from '../declarations/nft/nft.did';
 
 // Types
 export type Rarity = 'Common' | 'Uncommon' | 'Rare' | 'Epic' | 'Legendary';

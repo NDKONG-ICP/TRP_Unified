@@ -163,10 +163,63 @@ fn format_siwb_message(msg: &SIWBMessage) -> String {
 }
 
 fn verify_bitcoin_signature(message: &str, signature: &str, address: &str) -> bool {
-    // Bitcoin signature verification
-    // This is a placeholder - in production, implement proper ECDSA verification
-    // Bitcoin uses secp256k1 and base58 encoding
-    true // TODO: Implement proper signature verification
+    // Bitcoin signature verification using secp256k1
+    // Bitcoin signed message prefix: "\x18Bitcoin Signed Message:\n"
+    let prefix = format!("\x18Bitcoin Signed Message:\n{}", message.len());
+    let mut hasher = sha2::Sha256::new();
+    hasher.update(prefix.as_bytes());
+    hasher.update(message.as_bytes());
+    let message_hash = hasher.finalize();
+    
+    let sig_bytes = match hex::decode(signature.strip_prefix("0x").unwrap_or(signature)) {
+        Ok(bytes) => bytes,
+        Err(_) => {
+            // Try base64 (standard Bitcoin signature format)
+            match base64::engine::general_purpose::STANDARD.decode(signature) {
+                Ok(bytes) => bytes,
+                Err(_) => return false,
+            }
+        }
+    };
+
+    if sig_bytes.len() != 65 {
+        return false;
+    }
+
+    // Bitcoin compact signature format: [v, r, s]
+    // v is the recovery ID + 27 (+ 4 if compressed)
+    let v = sig_bytes[0];
+    let recovery_id_val = if v >= 27 { (v - 27) % 4 } else { v };
+
+    let recovery_id = match libsecp256k1::RecoveryId::parse(recovery_id_val) {
+        Ok(id) => id,
+        Err(_) => return false,
+    };
+
+    let signature_obj = match libsecp256k1::Signature::parse_standard(&sig_bytes[1..65]) {
+        Ok(sig) => sig,
+        Err(_) => return false,
+    };
+
+    let message_hash_fixed = {
+        let mut arr = [0u8; 32];
+        arr.copy_from_slice(&message_hash);
+        libsecp256k1::Message::parse(&arr)
+    };
+
+    let pubkey = match libsecp256k1::recover(&message_hash_fixed, &signature_obj, &recovery_id) {
+        Ok(pk) => pk,
+        Err(_) => return false,
+    };
+
+    // Derive address from public key to verify match
+    let pubkey_bytes = pubkey.serialize();
+    let sha256_hash = sha2::Sha256::digest(&pubkey_bytes);
+    let ripemd160_hash = ripemd::Ripemd160::digest(&sha256_hash);
+    
+    // Check if address matches (simplified check for P2PKH or SegWit hash)
+    let hash_hex = hex::encode(&ripemd160_hash);
+    address.contains(&hash_hex) || bs58::encode(&ripemd160_hash).into_string() == address
 }
 
 fn derive_principal_from_address(address: &str) -> Principal {

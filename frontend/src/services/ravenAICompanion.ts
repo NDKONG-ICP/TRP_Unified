@@ -17,6 +17,7 @@ import { BackendAIService, backendAIService, AICouncilResponse } from './backend
 import { AICouncil, CouncilResult, ConsensusResult } from './aiCouncil';
 import { API_KEYS, isConfigured } from '../config/secureConfig';
 import { useAuthStore } from '../stores/authStore';
+import { createDemoIdentity, isDemoLimitReached } from './demoAuthService';
 
 // ============================================================================
 // Secure Configuration - API keys loaded from environment
@@ -163,11 +164,31 @@ export class RavenAICompanion {
         .map(m => ({ role: m.role, content: m.content, timestamp: m.timestamp }));
       const contextString = context.map(c => `${c.role}: ${c.content}`).join('\n');
       
-      // Ensure backend is initialized with current identity before use
+      // Ensure backend is initialized with current identity (or demo identity) before use
       if (this.useBackend) {
         try {
-          const identity = useAuthStore.getState().identity;
-          await backendAIService.init(identity || undefined);
+          let identity = useAuthStore.getState().identity;
+          
+          // If no authenticated identity, use demo identity
+          if (!identity) {
+            // Check demo rate limit first
+            if (isDemoLimitReached()) {
+              const errorMsg: CompanionMessage = {
+                id: `assistant-${Date.now()}`,
+                role: 'assistant',
+                content: 'You\'ve reached the demo message limit! Connect your wallet to continue chatting with unlimited access.',
+                timestamp: Date.now(),
+                agentId: this.config.agentId,
+              };
+              this.conversationHistory.push(errorMsg);
+              return errorMsg;
+            }
+            
+            console.log('🤖 Using demo identity for backend AI...');
+            identity = createDemoIdentity();
+          }
+          
+          await backendAIService.init(identity);
           this.backendInitialized = true;
         } catch (initError) {
           console.warn('Backend AI initialization failed:', initError);
@@ -175,10 +196,13 @@ export class RavenAICompanion {
         }
       }
       
-      // Try backend service first (uses HTTP outcalls, no CORS)
-      // Only if authenticated (backend requires auth)
-      const identity = useAuthStore.getState().identity;
-      if (this.useBackend && this.backendInitialized && identity) {
+      // On mainnet, always use backend canister (browser HuggingFace calls fail due to CORS)
+      // Demo mode: use ephemeral identity to call start_demo on backend
+      // Auth mode: use authenticated identity
+      const authIdentity = useAuthStore.getState().identity;
+      const effectiveIdentity = authIdentity || createDemoIdentity();
+      
+      if (this.useBackend && this.backendInitialized && effectiveIdentity) {
         try {
           console.log('🤖 RavenAI Companion: Querying backend AI Council via HTTP outcalls...');
           const backendResponse = await backendAIService.queryAICouncil(
@@ -209,37 +233,44 @@ export class RavenAICompanion {
             totalLatencyMs: 0,
             timestamp: Date.now(),
           };
-        } catch (backendError) {
-          console.warn('Backend AI failed, using local fallback:', backendError);
-          // Fall through to local AI Council
+        } catch (backendError: any) {
+          console.error('Backend AI failed:', backendError);
+          const errorMsg: CompanionMessage = {
+            id: `assistant-${Date.now()}`,
+            role: 'assistant',
+            content: backendError.message || 'AI service unavailable. Please try again later.',
+            timestamp: Date.now(),
+            agentId: this.config.agentId,
+          };
+          this.conversationHistory.push(errorMsg);
+          return errorMsg;
         }
+      } else {
+        // Backend not available - generate fallback response
+        console.log('🤖 Backend unavailable, generating local fallback response...');
+        conversationalResponse = this.generateFallbackResponse(userMessage, 'Backend service unavailable');
+        councilResult = undefined;
       }
       
-      // Fallback to local AI Council (uses intelligent fallback due to CORS)
-      if (!conversationalResponse!) {
-        console.log('🤖 RavenAI Companion: Using local AI Council...');
-        councilResult = await this.aiCouncil.queryCouncil(userMessage, contextString);
-        conversationalResponse = this.composeConversationalResponse(councilResult, userMessage);
-      }
-      
-      // Generate voice if enabled
+      // Generate voice if enabled (backend-only on mainnet)
       let audioUrl: string | undefined;
       if (this.config.voiceEnabled) {
         try {
-          // Try backend voice synthesis first (uses HTTP outcalls to Eleven Labs)
-          // Only if authenticated (backend requires auth)
-          if (this.useBackend && this.backendInitialized && identity) {
+          // Backend voice synthesis (uses HTTP outcalls to Eleven Labs via canister)
+          // Works for both authenticated users and demo mode
+          if (this.useBackend && this.backendInitialized && effectiveIdentity) {
             console.log('🔊 Using backend Eleven Labs voice synthesis...');
             await backendAIService.playVoice(conversationalResponse);
             console.log('✅ Eleven Labs voice playback complete');
           } else {
-            // Fallback to local synthesis or browser TTS
-            const voiceResponse = await this.synthesizeVoice(conversationalResponse);
-            audioUrl = voiceResponse?.audioUrl;
+            // Backend unavailable - use browser TTS as fallback
+            console.log('🔊 Using browser TTS (backend unavailable)');
+            this.browserTTS(conversationalResponse);
           }
         } catch (voiceError) {
-          console.warn('Voice synthesis failed, using browser TTS:', voiceError);
-          // Try browser TTS as last resort
+          // Backend voice failed (common on IC due to non-deterministic audio outcalls)
+          // Fall back to browser TTS without retry loops
+          console.warn('Backend voice failed, using browser TTS:', voiceError);
           this.browserTTS(conversationalResponse);
         }
       }
@@ -384,39 +415,12 @@ export class RavenAICompanion {
 
   /**
    * Synthesize voice using Eleven Labs API
+   * DEPRECATED: This method is kept for backwards compatibility but should not be called on mainnet.
+   * Voice synthesis should go through backend canister (backendAIService.playVoice).
    */
   async synthesizeVoice(text: string): Promise<VoiceResponse> {
-    const url = `${ELEVEN_LABS_API_URL}/${this.config.voiceId}/stream`;
-    
-    // Truncate text if too long for voice (Eleven Labs has limits)
-    const maxVoiceLength = 2000;
-    const voiceText = text.length > maxVoiceLength 
-      ? text.substring(0, maxVoiceLength) + '...'
-      : text;
-    
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'xi-api-key': ELEVEN_LABS_API_KEY,
-        'Accept': 'audio/mpeg',
-      },
-      body: JSON.stringify({
-        text: voiceText,
-        model_id: 'eleven_monolingual_v1',
-        voice_settings: VOICE_SETTINGS,
-      }),
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Eleven Labs error: ${response.status} - ${errorText}`);
-    }
-    
-    const audioBlob = await response.blob();
-    const audioUrl = URL.createObjectURL(audioBlob);
-    
-    return { audioBlob, audioUrl };
+    // This method should not be called on mainnet - backend voice is required
+    throw new Error('Direct ElevenLabs voice synthesis is disabled. Use backend canister for voice synthesis.');
   }
 
   /**

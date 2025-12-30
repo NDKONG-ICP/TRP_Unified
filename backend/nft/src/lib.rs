@@ -28,14 +28,7 @@ const APPROVALS_MEM_ID: MemoryId = MemoryId::new(4);
 const CONTROLLER_CONFIG_MEM_ID: MemoryId = MemoryId::new(5);
 const CONTROLLER_RECORDS_MEM_ID: MemoryId = MemoryId::new(6);
 
-// Admin principals that should always be controllers
-const ADMIN_PRINCIPALS: &[&str] = &[
-    "lgd5r-y4x7q-lbrfa-mabgw-xurgu-4h3at-sw4sl-yyr3k-5kwgt-vlkao-jae",
-    "yyirv-5pjkg-oupac-gzja4-ljzfn-6mvon-r5w2i-6e7wm-sde75-wuses-nqe",
-    "ucw6l-apn5m-ycnrv-s7xtt-lvchu-jz5f3-3oeq7-ttuhk-rjvjp-sdnbj-lqe",
-    "sh7h6-b7xcy-tjank-crj6d-idrcr-ormbi-22yqs-uanyl-itbp3-ur5ue-wae",
-    "imnyd-k37s2-xlg7c-omeed-ezrzg-6oesa-r3ek6-xrwuz-qbliq-5h675-yae",
-];
+// Admin principals that should always be controllers - Managed dynamically
 
 // Rarity tiers
 #[derive(CandidType, Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -275,13 +268,11 @@ thread_local! {
         ));
 }
 
-// Primary admin principal
-const ADMIN_PRINCIPAL: &str = "lgd5r-y4x7q-lbrfa-mabgw-xurgu-4h3at-sw4sl-yyr3k-5kwgt-vlkao-jae";
+// Primary admin principal - Managed dynamically
 
 fn is_admin(caller: Principal) -> bool {
     CONFIG.with(|c| c.borrow().get().admin == caller)
-        || caller.to_text() == ADMIN_PRINCIPAL
-        || ADMIN_PRINCIPALS.iter().any(|p| *p == caller.to_text())
+        || ic_cdk::api::is_controller(&caller)
 }
 
 fn is_controller(caller: Principal) -> bool {
@@ -299,24 +290,16 @@ fn init() {
     
     CONFIG.with(|c| {
         let mut config = c.borrow().get().clone();
-        config.admin = if caller != Principal::anonymous() {
-            caller
-        } else {
-            Principal::from_text(ADMIN_PRINCIPAL).unwrap()
-        };
+        config.admin = caller;
         c.borrow_mut().set(config).unwrap();
     });
 
-    // Initialize controller config with admin principals and this canister
+    // Initialize controller config with caller and this canister
     CONTROLLER_CONFIG.with(|c| {
         let mut config = ControllerConfig::default();
         
-        // Add admin principals
-        for admin_str in ADMIN_PRINCIPALS {
-            if let Ok(admin) = Principal::from_text(*admin_str) {
-                config.admin_principals.push(admin);
-            }
-        }
+        // Add caller as an admin principal
+        config.admin_principals.push(caller);
         
         // Add this canister as a backend canister controller
         config.backend_canisters.push(this_canister);

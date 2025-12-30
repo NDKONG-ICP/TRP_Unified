@@ -105,6 +105,61 @@ type VoidResult = variant {
     Err: text;
 };
 
+// Linked wallets
+type LinkedWallets = record {
+    solana_pubkeys: vec text;
+    sui_addresses: vec text;
+    evm_addresses: vec text;
+};
+
+// SIWS/SIS message payloads (used for wallet-linking challenges)
+type SIWSMessage = record {
+  domain: text;
+  address: text;
+  statement: opt text;
+  uri: text;
+  version: text;
+  chain_id: text;
+  nonce: text;
+  issued_at: text;
+  expiration_time: opt text;
+  not_before: opt text;
+  request_id: opt text;
+  resources: opt vec text;
+};
+
+type SISMessage = record {
+  domain: text;
+  address: text;
+  statement: opt text;
+  uri: text;
+  version: text;
+  chain_id: text;
+  nonce: text;
+  issued_at: text;
+  expiration_time: opt text;
+  not_before: opt text;
+  request_id: opt text;
+  resources: opt vec text;
+};
+
+type LinkPayload = variant {
+  Solana: SIWSMessage;
+  Sui: SISMessage;
+};
+
+type WalletLinkChallenge = record {
+  kind: text;
+  issued_at: nat64;
+  expires_at: nat64;
+  payload: LinkPayload;
+};
+
+type WalletLinkResult = variant {
+  Ok: WalletLinkChallenge;
+  Err: text;
+};
+
 service : {
     // Profile Management
     create_profile: (text, text, opt text) -> (ProfileResult);
@@ -137,4 +192,10 @@ service : {
     set_admin: (principal) -> ();
     get_all_profiles: () -> (vec KIPProfile) query;
     get_stats: () -> (record { total_profiles: nat64; verified_profiles: nat64; pending_docs: nat64 }) query;
+
+    // Linked wallets (Phantom/Sui). Principal is canonical; wallets are linked via signature challenge.
+    start_link_wallet: (text) -> (WalletLinkResult);
+    confirm_link_wallet: (LinkPayload, text) -> (VoidResult);
+    get_linked_wallets: (principal) -> (opt LinkedWallets) query;
+    get_my_linked_wallets: () -> (opt LinkedWallets) query;
 }

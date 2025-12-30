@@ -1,0 +1,261 @@
+// IC Spicy RWA NFT Collection & Storefront - Full ICRC7/ICRC37 and EXT Compliance
+
+// EXT Standard Types
+type TokenIndex = nat;
+type AccountIdentifier = blob;
+type SubAccount = blob;
+type Memo = blob;
+type Balance = nat;
+type Time = nat64;
+
+type TokenMetadata = record {
+  metadata: opt blob;
+};
+
+type TransferRequest = record {
+  from: AccountIdentifier;
+  to: AccountIdentifier;
+  token: TokenIndex;
+  notify: bool;
+  memo: Memo;
+  subaccount: opt SubAccount;
+};
+
+type TransferResponse = variant {
+  Ok: Balance;
+  Err: TransferError;
+};
+
+type TransferError = variant {
+  CannotNotify: AccountIdentifier;
+  InsufficientBalance: record { balance: Balance };
+  InvalidToken: TokenIndex;
+  Rejected: record { fee: Balance };
+  Unauthorized: AccountIdentifier;
+};
+
+// ICRC7/ICRC37 Types
+type ICRC7Token = record {
+  id: nat;
+  owner: principal;
+  metadata: text;
+};
+
+type ICRC37TransferRequest = record {
+  from: principal;
+  to: principal;
+  token_id: nat;
+};
+
+// TokenType for multichain payments
+type TokenType = variant {
+  ICP;
+  CkBTC;
+  CkETH;
+  CkUSDC;
+  CkUSDT;
+  HARLEE;
+  RAVEN;
+  BTC;
+  ETH;
+  SOL;
+  SUI;
+};
+
+// Layer Upload
+type LayerUpload = record {
+  layer_name: text;
+  trait_images: vec record { name: text; data: blob };
+};
+
+type ProjectUpload = record {
+  project_name: text;
+  layers: vec LayerUpload;
+};
+
+type MultichainMetadata = record {
+  icp_canister: text;
+  eth_contract: opt text;
+  eth_token_id: opt text;
+  evm_chain_id: opt nat64;
+  sol_mint: opt text;
+  btc_inscription: opt text;
+  standards: vec text;
+};
+
+// NFT Generation
+type GeneratedNFT = record {
+  token_id: nat;
+  layers: vec text;
+  rarity_score: float64;
+  metadata: text;
+  composite_image: opt blob;
+  owner: principal;
+  is_og: bool;
+  price_usd: opt float64;
+  multichain_metadata: MultichainMetadata;
+};
+
+// Minting
+type MintRequest = record {
+  recipient: opt principal;
+  quantity: nat;
+};
+
+type MintResponse = record {
+  token_ids: vec nat;
+  success: bool;
+};
+
+// User Roles
+type UserRole = variant {
+  Admin;
+  User;
+};
+
+type User = record {
+  user_principal: principal;
+  role: UserRole;
+  registered_at: nat64;
+};
+
+// Admin Configuration
+type AdminConfig = record {
+  target_canister_id: principal;
+  icrc7_installed: bool;
+  icrc37_installed: bool;
+  ext_installed: bool;
+};
+
+// Farm Stats
+type FarmStats = record {
+  total_plants: nat64;
+  members: nat64;
+  harvest_yield: text;
+  co2_offset: text;
+};
+
+// RWA Storefront Types
+type ShopCategory = variant {
+  Pods;
+  Plants;
+  Seeds;
+  Blends;
+  Merch;
+};
+
+type ShopProduct = record {
+  id: text;
+  name: text;
+  description: text;
+  price_usd: float64;
+  category: ShopCategory;
+  inventory: nat32;
+  in_stock: bool;
+  image_url: opt text;
+};
+
+type PaymentStatus = variant {
+  Pending;
+  Paid;
+  Failed;
+  Refunded;
+};
+
+type ShippingStatus = variant {
+  Processing;
+  Shipped;
+  Delivered;
+  Cancelled;
+};
+
+type RWAOrder = record {
+  id: nat64;
+  customer: principal;
+  items: vec record { text; nat32 };
+  total_usd: float64;
+  payment_status: PaymentStatus;
+  shipping_status: ShippingStatus;
+  shipping_address: text;
+  created_at: nat64;
+  tracking_number: opt text;
+};
+
+type TransactionType = variant {
+  Mint;
+  Transfer;
+  Claim;
+};
+
+type NFTTransaction = record {
+  id: nat64;
+  transaction_type: TransactionType;
+  token_id: nat64;
+  from: opt principal;
+  to: principal;
+  timestamp: nat64;
+  memo: opt text;
+};
+  
+type Result = variant { Ok: text; Err: text };
+type Result_1 = variant { Ok: nat64; Err: text };
+type Result_2 = variant { Ok: null; Err: text };
+
+service : {
+  // EXT Standard Methods
+  ext_getTokens: (principal) -> (vec TokenIndex) query;
+  ext_getTokenMetadata: (TokenIndex) -> (TokenMetadata) query;
+  ext_transfer: (TransferRequest) -> (TransferResponse);
+  ext_ownerOf: (TokenIndex) -> (opt principal) query;
+  ext_mint: (principal, opt blob) -> (variant { Ok: TokenIndex; Err: text });
+  ext_balance: (principal) -> (Balance) query;
+  ext_tokens: (nat, nat) -> (vec TokenIndex) query;
+  
+  // ICRC7/ICRC37 Methods
+  icrc7_getToken: (nat) -> (opt ICRC7Token) query;
+  icrc7_getTokens: (principal) -> (vec ICRC7Token) query;
+  icrc37_transfer: (ICRC37TransferRequest) -> (bool);
+  
+  // Layer Upload
+  upload_project: (ProjectUpload) -> (variant { Ok: text; Err: text });
+  get_layers: () -> (vec text) query;
+  
+  // Generative Engine
+  generate_nft: () -> (variant { Ok: GeneratedNFT; Err: text });
+  get_rarity_score: (nat) -> (float64) query;
+  
+  // Minting
+  mint: (opt principal) -> (variant { Ok: MintResponse; Err: text });
+  batch_mint: (MintRequest) -> (variant { Ok: MintResponse; Err: text });
+  
+  // User Management
+  get_user_role_query: (principal) -> (opt UserRole) query;
+  is_admin_query: (principal) -> (bool) query;
+  
+  // Admin
+  get_admin_config: () -> (AdminConfig) query;
+  set_target_canister: (principal) -> (variant { Ok: text; Err: text });
+  install_standards: () -> (variant { Ok: text; Err: text });
+  
+  // Wallet
+  get_user_tokens: (principal) -> (vec nat) query;
+  transfer_nft: (principal, nat) -> (variant { Ok: bool; Err: text });
+  
+  // Query
+  get_nft_info: (nat64) -> (opt GeneratedNFT) query;
+  get_all_nfts: () -> (vec GeneratedNFT) query;
+  get_voting_power: (principal) -> (nat64) query;
+  
+  // Collection Pre-mint
+  pre_mint_collection: (nat64, nat64) -> (variant { Ok: text; Err: text });
+  buy_collection_nft: (nat64, TokenType, nat64, opt text) -> (variant { Ok: bool; Err: text });
+  get_collection_nfts: () -> (vec GeneratedNFT) query;
+
+  // Treasury
+  collect_platform_fee: (principal, nat64) -> (variant { Ok: text; Err: text });
+  
+  // Real Multi-Chain Deployment (Deterministic Addresses)
+  deploy_evm_contract: (text) -> (variant { Ok: text; Err: text });
+  deploy_bitcoin_ordinal: (text) -> (variant { Ok: text; Err: text });
+  deploy_solana_program: (text) -> (variant { Ok: text; Err: text });
+}

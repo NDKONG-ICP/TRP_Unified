@@ -146,8 +146,6 @@ export async function signMessage(message: string): Promise<string> {
  * Get SUI balance
  */
 export async function getSUIBalance(address: string): Promise<number> {
-  // Query Sui network via RPC
-  // This is a placeholder - in production, use Sui RPC
   try {
     const response = await fetch(`https://fullnode.mainnet.sui.io`, {
       method: 'POST',

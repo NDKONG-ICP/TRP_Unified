@@ -1,6 +1,6 @@
 /**
  * IC SPICY Service - Real-World Asset Co-op Data
- * Manages farm dashboard, inventory, shop products, and menu items
+ * Manages farm dashboard, inventory, shop products, and NFT generation
  */
 
 import { Actor, HttpAgent, Identity } from '@dfinity/agent';
@@ -9,522 +9,277 @@ import { getCanisterId, getICHost, isMainnet } from './canisterConfig';
 
 // ============ TYPES ============
 
-// Farm Dashboard
+export interface MultichainMetadata {
+  icp_canister: string;
+  eth_contract: [] | [string];
+  eth_token_id: [] | [string];
+  evm_chain_id: [] | [bigint];
+  sol_mint: [] | [string];
+  btc_inscription: [] | [string];
+  standards: string[];
+}
+
+export interface GeneratedNFT {
+  token_id: bigint;
+  layers: string[];
+  rarity_score: number;
+  metadata: string;
+  composite_image: [] | [Uint8Array | number[]];
+  owner: Principal;
+  is_og: boolean;
+  price_usd: [] | [number];
+  multichain_metadata: MultichainMetadata;
+}
+
 export interface FarmStats {
   totalPlants: number;
-  activeCrops: Crop[];
-  harvestReady: number;
-  waterLevel: number; // 0-100
-  temperature: number; // Fahrenheit
-  humidity: number; // 0-100
+  members: number;
+  harvestYield: string;
+  co2Offset: string;
   lastUpdated: number;
-  // Additional fields for IC SPICY co-op stats
-  members?: number;
-  harvestYield?: string;
-  co2Offset?: string;
 }
 
-export interface Crop {
-  id: string;
-  name: string;
-  variety: string;
-  plantedDate: number;
-  estimatedHarvest: number;
-  status: 'seedling' | 'growing' | 'flowering' | 'fruiting' | 'harvest_ready';
-  quantity: number;
-  location: string;
-}
-
-// Inventory
-export interface InventoryItem {
-  id: string;
-  category: 'pepper_pods' | 'plants' | 'seeds' | 'spice_blends';
-  name: string;
-  description: string;
-  quantity: number;
-  unit: string;
-  priceICP: bigint;
-  priceUSD: number;
-  imageUrl: string;
-  scovilleRating?: number;
-  inStock: boolean;
-  featured: boolean;
-}
-
-// Menu Items (In-Person)
-export interface MenuItem {
+export interface ShopProduct {
   id: string;
   name: string;
   description: string;
-  price: number;
-  category: 'appetizers' | 'mains' | 'sides' | 'sauces' | 'drinks';
-  spiceLevel: 1 | 2 | 3 | 4 | 5;
-  available: boolean;
-  imageUrl?: string;
-  ingredients: string[];
-  allergens: string[];
+  price_usd: number;
+  category: { Pods: null } | { Plants: null } | { Seeds: null } | { Blends: null } | { Merch: null };
+  inventory: number;
+  in_stock: boolean;
+  image_url: [] | [string];
 }
-
-// Orders
-export interface Order {
-  id: string;
-  customer: string;
-  items: OrderItem[];
-  totalICP: bigint;
-  totalUSD: number;
-  status: 'pending' | 'confirmed' | 'processing' | 'shipped' | 'delivered';
-  createdAt: number;
-  updatedAt: number;
-  shippingAddress?: string;
-  trackingNumber?: string;
-}
-
-export interface OrderItem {
-  itemId: string;
-  name: string;
-  quantity: number;
-  priceICP: bigint;
-}
-
-// ============ INITIAL DATA ============
-
-// Real IC SPICY product data
-const SHOP_PRODUCTS: InventoryItem[] = [
-  // Fresh Pepper Pods
-  {
-    id: 'pod-carolina-reaper',
-    category: 'pepper_pods',
-    name: 'Carolina Reaper Pods',
-    description: 'World\'s hottest pepper. Fresh harvested from our Florida farm. Handle with extreme caution.',
-    quantity: 0, // Will be fetched from backend
-    unit: 'lb',
-    priceICP: BigInt(5_00000000), // 5 ICP
-    priceUSD: 45.00,
-    imageUrl: '/peppers/carolina-reaper.jpg',
-    scovilleRating: 2200000,
-    inStock: false,
-    featured: true,
-  },
-  {
-    id: 'pod-ghost-pepper',
-    category: 'pepper_pods',
-    name: 'Ghost Pepper (Bhut Jolokia)',
-    description: 'Legendary super-hot pepper with smoky, fruity flavor. Fresh from our greenhouse.',
-    quantity: 0,
-    unit: 'lb',
-    priceICP: BigInt(4_00000000),
-    priceUSD: 35.00,
-    imageUrl: '/peppers/ghost-pepper.jpg',
-    scovilleRating: 1041427,
-    inStock: false,
-    featured: true,
-  },
-  {
-    id: 'pod-habanero',
-    category: 'pepper_pods',
-    name: 'Orange Habanero Pods',
-    description: 'Classic Caribbean heat with citrus undertones. Perfect for salsas and hot sauces.',
-    quantity: 0,
-    unit: 'lb',
-    priceICP: BigInt(2_50000000),
-    priceUSD: 22.00,
-    imageUrl: '/peppers/habanero.jpg',
-    scovilleRating: 350000,
-    inStock: false,
-    featured: false,
-  },
-  {
-    id: 'pod-scotch-bonnet',
-    category: 'pepper_pods',
-    name: 'Scotch Bonnet Pods',
-    description: 'Essential for Caribbean cuisine. Sweet, fruity heat profile.',
-    quantity: 0,
-    unit: 'lb',
-    priceICP: BigInt(2_50000000),
-    priceUSD: 22.00,
-    imageUrl: '/peppers/scotch-bonnet.jpg',
-    scovilleRating: 250000,
-    inStock: false,
-    featured: false,
-  },
-  // Nursery Plants
-  {
-    id: 'plant-reaper-seedling',
-    category: 'plants',
-    name: 'Carolina Reaper Seedling',
-    description: 'Live plant ready for transplant. Florida registered nursery certified.',
-    quantity: 0,
-    unit: 'plant',
-    priceICP: BigInt(1_50000000),
-    priceUSD: 12.00,
-    imageUrl: '/plants/reaper-seedling.jpg',
-    inStock: false,
-    featured: true,
-  },
-  {
-    id: 'plant-ghost-seedling',
-    category: 'plants',
-    name: 'Ghost Pepper Seedling',
-    description: 'Healthy starter plant. Grows well in containers or garden beds.',
-    quantity: 0,
-    unit: 'plant',
-    priceICP: BigInt(1_25000000),
-    priceUSD: 10.00,
-    imageUrl: '/plants/ghost-seedling.jpg',
-    inStock: false,
-    featured: false,
-  },
-  {
-    id: 'plant-variety-pack',
-    category: 'plants',
-    name: 'Hot Pepper Variety Pack (6)',
-    description: '6 different pepper seedlings: Reaper, Ghost, Habanero, Scotch Bonnet, Thai, Cayenne',
-    quantity: 0,
-    unit: 'pack',
-    priceICP: BigInt(6_00000000),
-    priceUSD: 50.00,
-    imageUrl: '/plants/variety-pack.jpg',
-    inStock: false,
-    featured: true,
-  },
-  // Seeds
-  {
-    id: 'seed-reaper-pack',
-    category: 'seeds',
-    name: 'Carolina Reaper Seeds (10)',
-    description: 'Viable seeds from our champion plants. Includes growing guide.',
-    quantity: 0,
-    unit: 'pack',
-    priceICP: BigInt(75000000),
-    priceUSD: 6.00,
-    imageUrl: '/seeds/reaper-seeds.jpg',
-    scovilleRating: 2200000,
-    inStock: false,
-    featured: false,
-  },
-  {
-    id: 'seed-super-hot-mix',
-    category: 'seeds',
-    name: 'Super Hot Seed Mix (25)',
-    description: 'Mix of world\'s hottest varieties. Perfect for pepper enthusiasts.',
-    quantity: 0,
-    unit: 'pack',
-    priceICP: BigInt(1_50000000),
-    priceUSD: 12.00,
-    imageUrl: '/seeds/super-hot-mix.jpg',
-    inStock: false,
-    featured: true,
-  },
-  // Spice Blends
-  {
-    id: 'blend-reaper-flakes',
-    category: 'spice_blends',
-    name: 'Carolina Reaper Flakes',
-    description: 'Dried and crushed reaper peppers. A little goes a LONG way.',
-    quantity: 0,
-    unit: 'oz',
-    priceICP: BigInt(1_00000000),
-    priceUSD: 8.00,
-    imageUrl: '/spices/reaper-flakes.jpg',
-    scovilleRating: 2200000,
-    inStock: false,
-    featured: true,
-  },
-  {
-    id: 'blend-ghost-powder',
-    category: 'spice_blends',
-    name: 'Ghost Pepper Powder',
-    description: 'Finely ground ghost peppers for extreme heat seekers.',
-    quantity: 0,
-    unit: 'oz',
-    priceICP: BigInt(80000000),
-    priceUSD: 7.00,
-    imageUrl: '/spices/ghost-powder.jpg',
-    scovilleRating: 1041427,
-    inStock: false,
-    featured: false,
-  },
-  {
-    id: 'blend-caribbean-jerk',
-    category: 'spice_blends',
-    name: 'Caribbean Jerk Spice Blend',
-    description: 'Authentic blend with scotch bonnets, allspice, thyme. Medium-hot.',
-    quantity: 0,
-    unit: 'oz',
-    priceICP: BigInt(60000000),
-    priceUSD: 5.00,
-    imageUrl: '/spices/caribbean-jerk.jpg',
-    scovilleRating: 50000,
-    inStock: false,
-    featured: false,
-  },
-];
-
-// Real menu items for in-person location
-const MENU_ITEMS: MenuItem[] = [
-  {
-    id: 'menu-wings-reaper',
-    name: 'Carolina Reaper Wings',
-    description: 'Crispy wings tossed in our house-made reaper sauce. Signed waiver required.',
-    price: 18.99,
-    category: 'appetizers',
-    spiceLevel: 5,
-    available: true,
-    ingredients: ['Chicken wings', 'Carolina Reaper sauce', 'Butter', 'Garlic'],
-    allergens: ['Dairy'],
-  },
-  {
-    id: 'menu-wings-ghost',
-    name: 'Ghost Pepper Wings',
-    description: 'For those who want serious heat without the reaper intensity.',
-    price: 16.99,
-    category: 'appetizers',
-    spiceLevel: 4,
-    available: true,
-    ingredients: ['Chicken wings', 'Ghost pepper sauce', 'Honey', 'Lime'],
-    allergens: [],
-  },
-  {
-    id: 'menu-nachos-spicy',
-    name: 'Spicy Loaded Nachos',
-    description: 'Tortilla chips with habanero cheese sauce, jalapeños, and ghost pepper salsa.',
-    price: 14.99,
-    category: 'appetizers',
-    spiceLevel: 3,
-    available: true,
-    ingredients: ['Tortilla chips', 'Cheese', 'Jalapeños', 'Ghost pepper salsa', 'Sour cream'],
-    allergens: ['Dairy', 'Gluten'],
-  },
-  {
-    id: 'menu-tacos-inferno',
-    name: 'Inferno Street Tacos',
-    description: 'Three tacos with your choice of protein, topped with reaper pico de gallo.',
-    price: 15.99,
-    category: 'mains',
-    spiceLevel: 4,
-    available: true,
-    ingredients: ['Corn tortillas', 'Choice of meat', 'Reaper pico', 'Cilantro', 'Onion'],
-    allergens: [],
-  },
-  {
-    id: 'menu-burger-ghost',
-    name: 'Ghost Burger',
-    description: 'Half-pound beef patty with ghost pepper jack cheese and habanero aioli.',
-    price: 17.99,
-    category: 'mains',
-    spiceLevel: 3,
-    available: true,
-    ingredients: ['Beef patty', 'Ghost pepper jack', 'Habanero aioli', 'Lettuce', 'Tomato'],
-    allergens: ['Dairy', 'Gluten', 'Eggs'],
-  },
-  {
-    id: 'menu-rice-jerk',
-    name: 'Jerk Rice Bowl',
-    description: 'Caribbean jerk chicken over coconut rice with mango salsa.',
-    price: 14.99,
-    category: 'mains',
-    spiceLevel: 2,
-    available: true,
-    ingredients: ['Jerk chicken', 'Coconut rice', 'Mango salsa', 'Black beans'],
-    allergens: [],
-  },
-  {
-    id: 'menu-fries-loaded',
-    name: 'Loaded Pepper Fries',
-    description: 'Crispy fries with habanero cheese sauce and jalapeño bits.',
-    price: 8.99,
-    category: 'sides',
-    spiceLevel: 2,
-    available: true,
-    ingredients: ['French fries', 'Habanero cheese sauce', 'Jalapeños'],
-    allergens: ['Dairy', 'Gluten'],
-  },
-  {
-    id: 'menu-sauce-reaper',
-    name: 'House Reaper Hot Sauce (5oz)',
-    description: 'Take home a bottle of our signature Carolina Reaper sauce.',
-    price: 12.99,
-    category: 'sauces',
-    spiceLevel: 5,
-    available: true,
-    ingredients: ['Carolina Reapers', 'Vinegar', 'Garlic', 'Salt'],
-    allergens: [],
-  },
-  {
-    id: 'menu-sauce-ghost',
-    name: 'Ghost Pepper Sauce (5oz)',
-    description: 'Smoky ghost pepper sauce perfect for everyday use.',
-    price: 10.99,
-    category: 'sauces',
-    spiceLevel: 4,
-    available: true,
-    ingredients: ['Ghost peppers', 'Vinegar', 'Onion', 'Garlic'],
-    allergens: [],
-  },
-  {
-    id: 'menu-lemonade-mango',
-    name: 'Mango Habanero Lemonade',
-    description: 'Sweet and spicy refresher with real mango and a habanero kick.',
-    price: 5.99,
-    category: 'drinks',
-    spiceLevel: 1,
-    available: true,
-    ingredients: ['Lemonade', 'Mango puree', 'Habanero syrup'],
-    allergens: [],
-  },
-];
 
 // ============ SERVICE CLASS ============
 
 export class ICSpicyService {
   private agent: HttpAgent | null = null;
-  private coreActor: any = null;
 
   async init(identity?: Identity): Promise<void> {
     const host = getICHost();
     this.agent = new HttpAgent({ identity, host });
-    
-    if (!isMainnet) {
+    if (!isMainnet()) {
       await this.agent.fetchRootKey();
     }
   }
 
-  // ============ FARM DASHBOARD ============
+  private async getActor<T>(idlFactory: any): Promise<T> {
+    if (!this.agent) await this.init();
+    const canisterId = getCanisterId('icspicy');
+    return Actor.createActor(idlFactory, {
+      agent: this.agent!,
+      canisterId,
+    }) as unknown as T;
+  }
+
+  // ============ FARM & SHOP ============
 
   async getFarmStats(): Promise<FarmStats> {
-    try {
-      if (!this.agent) {
-        await this.init();
-      }
-      
-      const canisterId = getCanisterId('icspicy');
-      
-      // Inline IDL definition to avoid exposing .did files
-      const icspicyIdlFactory = ({ IDL }: { IDL: any }) => {
-        const FarmStats = IDL.Record({
-          'pepper_plants': IDL.Nat64,
+    const idl = ({ IDL }: any) => IDL.Service({
+      'get_farm_stats': IDL.Func([], [IDL.Record({
+        'total_plants': IDL.Nat64,
           'members': IDL.Nat64,
           'harvest_yield': IDL.Text,
           'co2_offset': IDL.Text,
           'last_updated': IDL.Nat64,
+      })], ['query']),
         });
-        
-        return IDL.Service({
-          'get_farm_stats': IDL.Func([], [FarmStats], ['query']),
-        });
-      };
-      
-      const actor = await Actor.createActor(icspicyIdlFactory, {
-        agent: this.agent,
-        canisterId,
-      });
-      
+    const actor = await this.getActor<any>(idl);
       const stats = await actor.get_farm_stats();
-      
-      // Convert backend format to frontend format
       return {
-        totalPlants: Number(stats.pepper_plants),
-        activeCrops: [],
-        harvestReady: 0,
-        waterLevel: 0,
-        temperature: 0,
-        humidity: 0,
-        lastUpdated: Number(stats.last_updated),
-        // Additional fields for ICSpicyPage
+      totalPlants: Number(stats.total_plants),
         members: Number(stats.members),
         harvestYield: stats.harvest_yield,
         co2Offset: stats.co2_offset,
+      lastUpdated: Number(stats.last_updated),
       };
-    } catch (error) {
-      console.error('Error fetching farm stats:', error);
-      // Return default on error
-      return {
-        totalPlants: 0,
-        activeCrops: [],
-        harvestReady: 0,
-        waterLevel: 0,
-        temperature: 0,
-        humidity: 0,
-        lastUpdated: Date.now(),
-        members: 0,
-        harvestYield: '--',
-        co2Offset: '--',
-      };
-    }
   }
 
-  async getCrops(): Promise<Crop[]> {
-    // Would fetch from backend
-    return [];
+  async getShopProducts(): Promise<ShopProduct[]> {
+    const idl = ({ IDL }: any) => IDL.Service({
+      'get_shop_products': IDL.Func([], [IDL.Vec(IDL.Record({
+        'id': IDL.Text,
+        'name': IDL.Text,
+        'description': IDL.Text,
+        'price_usd': IDL.Float64,
+        'category': IDL.Variant({ 'Pods': IDL.Null, 'Plants': IDL.Null, 'Seeds': IDL.Null, 'Blends': IDL.Null, 'Merch': IDL.Null }),
+        'inventory': IDL.Nat32,
+        'in_stock': IDL.Bool,
+        'image_url': IDL.Opt(IDL.Text),
+      }))], ['query']),
+    });
+    const actor = await this.getActor<any>(idl);
+    return await actor.get_shop_products();
   }
 
-  // ============ SHOP / INVENTORY ============
-
-  async getShopProducts(category?: string): Promise<InventoryItem[]> {
-    // Return real product catalog
-    // In production, quantities would be fetched from backend
-    let products = [...SHOP_PRODUCTS];
-    
-    if (category && category !== 'all') {
-      products = products.filter(p => p.category === category);
-    }
-    
-    return products;
+  async placeOrder(items: [string, number][], address: string, totalUsd: number): Promise<{ Ok: bigint } | { Err: string }> {
+    const idl = ({ IDL }: any) => IDL.Service({
+      'place_rwa_order': IDL.Func([IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat32)), IDL.Text, IDL.Float64], [IDL.Variant({ 'Ok': IDL.Nat64, 'Err': IDL.Text })], []),
+    });
+    const actor = await this.getActor<any>(idl);
+    return await actor.place_rwa_order(items, address, totalUsd);
   }
 
-  async getProductById(id: string): Promise<InventoryItem | null> {
-    return SHOP_PRODUCTS.find(p => p.id === id) || null;
-  }
+  // ============ NFT GENERATOR ============
 
-  async getFeaturedProducts(): Promise<InventoryItem[]> {
-    return SHOP_PRODUCTS.filter(p => p.featured);
-  }
-
-  async checkInventory(productId: string): Promise<{ inStock: boolean; quantity: number }> {
-    // In production, check real inventory from backend
-    const product = SHOP_PRODUCTS.find(p => p.id === productId);
-    return {
-      inStock: product?.inStock || false,
-      quantity: product?.quantity || 0,
+  async generateNFT(): Promise<{ Ok: GeneratedNFT } | { Err: string }> {
+    const idl = ({ IDL }: any) => {
+      const MultichainMetadata = IDL.Record({
+        'icp_canister': IDL.Text,
+        'eth_contract': IDL.Opt(IDL.Text),
+        'eth_token_id': IDL.Opt(IDL.Text),
+        'evm_chain_id': IDL.Opt(IDL.Nat64),
+        'sol_mint': IDL.Opt(IDL.Text),
+        'btc_inscription': IDL.Opt(IDL.Text),
+        'standards': IDL.Vec(IDL.Text),
+      });
+      const GeneratedNFT = IDL.Record({
+        'token_id': IDL.Nat,
+        'owner': IDL.Principal,
+        'metadata': IDL.Text,
+        'layers': IDL.Vec(IDL.Text),
+        'rarity_score': IDL.Float64,
+        'composite_image': IDL.Opt(IDL.Vec(IDL.Nat8)),
+        'is_og': IDL.Bool,
+        'price_usd': IDL.Opt(IDL.Float64),
+        'multichain_metadata': MultichainMetadata,
+      });
+      return IDL.Service({
+        'generate_nft': IDL.Func([], [IDL.Variant({ 'Ok': GeneratedNFT, 'Err': IDL.Text })], []),
+      });
     };
+    const actor = await this.getActor<any>(idl);
+    return await actor.generate_nft();
   }
 
-  // ============ MENU ============
-
-  async getMenuItems(category?: string): Promise<MenuItem[]> {
-    let items = [...MENU_ITEMS];
-    
-    if (category && category !== 'all') {
-      items = items.filter(m => m.category === category);
-    }
-    
-    return items;
+  async getCollectionNFTs(): Promise<GeneratedNFT[]> {
+    const idl = ({ IDL }: any) => {
+      const MultichainMetadata = IDL.Record({
+        'icp_canister': IDL.Text,
+        'eth_contract': IDL.Opt(IDL.Text),
+        'eth_token_id': IDL.Opt(IDL.Text),
+        'evm_chain_id': IDL.Opt(IDL.Nat64),
+        'sol_mint': IDL.Opt(IDL.Text),
+        'btc_inscription': IDL.Opt(IDL.Text),
+        'standards': IDL.Vec(IDL.Text),
+      });
+      const GeneratedNFT = IDL.Record({
+        'token_id': IDL.Nat,
+        'owner': IDL.Principal,
+        'metadata': IDL.Text,
+        'layers': IDL.Vec(IDL.Text),
+        'rarity_score': IDL.Float64,
+        'composite_image': IDL.Opt(IDL.Vec(IDL.Nat8)),
+        'is_og': IDL.Bool,
+        'price_usd': IDL.Opt(IDL.Float64),
+        'multichain_metadata': MultichainMetadata,
+      });
+      return IDL.Service({
+        'get_collection_nfts': IDL.Func([], [IDL.Vec(GeneratedNFT)], ['query']),
+      });
+    };
+    const actor = await this.getActor<any>(idl);
+    return await actor.get_collection_nfts();
   }
 
-  async getAvailableMenuItems(): Promise<MenuItem[]> {
-    return MENU_ITEMS.filter(m => m.available);
+  async buyCollectionNFT(tokenId: bigint, fromToken: any, paymentAmount: bigint, txHash?: string): Promise<{ Ok: boolean } | { Err: string }> {
+    const idl = ({ IDL }: any) => {
+      const TokenType = IDL.Variant({
+        'ICP': IDL.Null,
+        'CkBTC': IDL.Null,
+        'CkETH': IDL.Null,
+        'CkUSDC': IDL.Null,
+        'CkUSDT': IDL.Null,
+        'HARLEE': IDL.Null,
+        'RAVEN': IDL.Null,
+        'BTC': IDL.Null,
+        'ETH': IDL.Null,
+        'SOL': IDL.Null,
+        'SUI': IDL.Null,
+      });
+      return IDL.Service({
+        'buy_collection_nft': IDL.Func([IDL.Nat64, TokenType, IDL.Nat64, IDL.Opt(IDL.Text)], [IDL.Variant({ 'Ok': IDL.Bool, 'Err': IDL.Text })], []),
+      });
+    };
+    const actor = await this.getActor<any>(idl);
+    return await actor.buy_collection_nft(tokenId, fromToken, paymentAmount, txHash ? [txHash] : []);
   }
 
-  // ============ ORDERS ============
-
-  async createOrder(items: OrderItem[], shippingAddress?: string): Promise<Order | null> {
-    // In production, this would create an order in the backend
-    // Order creation will be implemented in future update
-    return null;
+  async preMintCollection(start: bigint, count: bigint): Promise<{ Ok: string } | { Err: string }> {
+    const idl = ({ IDL }: any) => IDL.Service({
+      'pre_mint_collection': IDL.Func([IDL.Nat64, IDL.Nat64], [IDL.Variant({ 'Ok': IDL.Text, 'Err': IDL.Text })], []),
+    });
+    const actor = await this.getActor<any>(idl);
+    return await actor.pre_mint_collection(start, count);
   }
 
-  async getMyOrders(principal: string): Promise<Order[]> {
-    // In production, fetch user's orders from backend
-    return [];
+  async mintNFT(recipient?: Principal): Promise<{ Ok: { token_ids: bigint[], success: boolean } } | { Err: string }> {
+    const idl = ({ IDL }: any) => {
+      const MintResponse = IDL.Record({ 'token_ids': IDL.Vec(IDL.Nat64), 'success': IDL.Bool });
+      return IDL.Service({
+        'mint': IDL.Func([IDL.Opt(IDL.Principal)], [IDL.Variant({ 'Ok': MintResponse, 'Err': IDL.Text })], []),
+      });
+    };
+    const actor = await this.getActor<any>(idl);
+    return await actor.mint(recipient ? [recipient] : []);
   }
 
-  async getOrderStatus(orderId: string): Promise<Order | null> {
-    // In production, fetch specific order
-    return null;
+  async getVotingPower(principal: Principal): Promise<bigint> {
+    const idl = ({ IDL }: any) => IDL.Service({
+      'get_voting_power': IDL.Func([IDL.Principal], [IDL.Nat64], ['query']),
+    });
+    const actor = await this.getActor<any>(idl);
+    return await actor.get_voting_power(principal);
+  }
+
+  async isAdmin(principal: Principal): Promise<boolean> {
+    const idl = ({ IDL }: any) => IDL.Service({
+      'is_admin_query': IDL.Func([IDL.Principal], [IDL.Bool], ['query']),
+    });
+    const actor = await this.getActor<any>(idl);
+    return await actor.is_admin_query(principal);
+  }
+
+  async getUserTokens(principal: Principal): Promise<bigint[]> {
+    const idl = ({ IDL }: any) => IDL.Service({
+      'get_user_tokens': IDL.Func([IDL.Principal], [IDL.Vec(IDL.Nat64)], ['query']),
+    });
+    const actor = await this.getActor<any>(idl);
+    return await actor.get_user_tokens(principal);
+  }
+
+  async getNFTInfo(tokenId: bigint): Promise<GeneratedNFT | null> {
+    const idl = ({ IDL }: any) => {
+      const MultichainMetadata = IDL.Record({
+        'icp_canister': IDL.Text,
+        'eth_contract': IDL.Opt(IDL.Text),
+        'eth_token_id': IDL.Opt(IDL.Text),
+        'evm_chain_id': IDL.Opt(IDL.Nat64),
+        'sol_mint': IDL.Opt(IDL.Text),
+        'btc_inscription': IDL.Opt(IDL.Text),
+        'standards': IDL.Vec(IDL.Text),
+      });
+      const GeneratedNFT = IDL.Record({
+        'token_id': IDL.Nat,
+        'owner': IDL.Principal,
+        'metadata': IDL.Text,
+        'layers': IDL.Vec(IDL.Text),
+        'rarity_score': IDL.Float64,
+        'composite_image': IDL.Opt(IDL.Vec(IDL.Nat8)),
+        'is_og': IDL.Bool,
+        'price_usd': IDL.Opt(IDL.Float64),
+        'multichain_metadata': MultichainMetadata,
+      });
+      return IDL.Service({
+        'get_nft_info': IDL.Func([IDL.Nat64], [IDL.Opt(GeneratedNFT)], ['query']),
+      });
+    };
+    const actor = await this.getActor<any>(idl);
+    const result = await actor.get_nft_info(tokenId);
+    return result[0] || null;
   }
 }
 
-// Singleton
 export const icSpicyService = new ICSpicyService();
 
 // ============ REACT HOOKS ============
@@ -538,38 +293,34 @@ export function useFarmStats(identity?: Identity) {
 
   const fetchStats = useCallback(async () => {
     setIsLoading(true);
-    setError(null);
-    
     try {
       await icSpicyService.init(identity);
       const data = await icSpicyService.getFarmStats();
       setStats(data);
     } catch (err: any) {
-      setError(err.message || 'Failed to fetch farm stats');
+      setError(err.message || 'Failed to fetch stats');
     } finally {
       setIsLoading(false);
     }
   }, [identity]);
 
-  useEffect(() => {
-    fetchStats();
-  }, [fetchStats]);
-
+  useEffect(() => { fetchStats(); }, [fetchStats]);
   return { stats, isLoading, error, refresh: fetchStats };
 }
 
 export function useShopProducts(category?: string, identity?: Identity) {
-  const [products, setProducts] = useState<InventoryItem[]>([]);
+  const [products, setProducts] = useState<ShopProduct[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const fetchProducts = useCallback(async () => {
     setIsLoading(true);
-    setError(null);
-    
     try {
       await icSpicyService.init(identity);
-      const data = await icSpicyService.getShopProducts(category);
+      let data = await icSpicyService.getShopProducts();
+      if (category && category !== 'all') {
+        data = data.filter(p => Object.keys(p.category)[0] === category);
+      }
       setProducts(data);
     } catch (err: any) {
       setError(err.message || 'Failed to fetch products');
@@ -578,81 +329,28 @@ export function useShopProducts(category?: string, identity?: Identity) {
     }
   }, [identity, category]);
 
-  useEffect(() => {
-    fetchProducts();
-  }, [fetchProducts]);
-
+  useEffect(() => { fetchProducts(); }, [fetchProducts]);
   return { products, isLoading, error, refresh: fetchProducts };
 }
 
-export function useMenuItems(category?: string, identity?: Identity) {
-  const [items, setItems] = useState<MenuItem[]>([]);
+export function useCollectionNFTs(identity?: Identity) {
+  const [nfts, setNfts] = useState<GeneratedNFT[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchItems = useCallback(async () => {
+  const fetchNfts = useCallback(async () => {
     setIsLoading(true);
-    setError(null);
-    
     try {
       await icSpicyService.init(identity);
-      const data = await icSpicyService.getMenuItems(category);
-      setItems(data);
+      const data = await icSpicyService.getCollectionNFTs();
+      setNfts(data);
     } catch (err: any) {
-      setError(err.message || 'Failed to fetch menu');
+      setError(err.message || 'Failed to fetch collection');
     } finally {
       setIsLoading(false);
     }
-  }, [identity, category]);
+  }, [identity]);
 
-  useEffect(() => {
-    fetchItems();
-  }, [fetchItems]);
-
-  return { items, isLoading, error, refresh: fetchItems };
-}
-
-// ============ HELPERS ============
-
-export function formatScoville(rating: number): string {
-  if (rating >= 1000000) {
-    return `${(rating / 1000000).toFixed(1)}M SHU`;
+  useEffect(() => { fetchNfts(); }, [fetchNfts]);
+  return { nfts, isLoading, error, refresh: fetchNfts };
   }
-  if (rating >= 1000) {
-    return `${(rating / 1000).toFixed(0)}K SHU`;
-  }
-  return `${rating} SHU`;
-}
-
-export function getSpiceLevelColor(level: number): string {
-  switch (level) {
-    case 1: return 'text-green-400';
-    case 2: return 'text-yellow-400';
-    case 3: return 'text-orange-400';
-    case 4: return 'text-red-400';
-    case 5: return 'text-red-600';
-    default: return 'text-gray-400';
-  }
-}
-
-export function getSpiceLevelEmoji(level: number): string {
-  return '🌶️'.repeat(level);
-}
-
-export function getCategoryLabel(category: string): string {
-  const labels: Record<string, string> = {
-    pepper_pods: 'Fresh Pepper Pods',
-    plants: 'Nursery Plants',
-    seeds: 'Seeds',
-    spice_blends: 'Spice Blends',
-    appetizers: 'Appetizers',
-    mains: 'Main Courses',
-    sides: 'Sides',
-    sauces: 'Sauces & Bottles',
-    drinks: 'Drinks',
-  };
-  return labels[category] || category;
-}
-
-export default icSpicyService;
-

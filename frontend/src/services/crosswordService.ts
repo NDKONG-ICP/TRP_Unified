@@ -32,7 +32,7 @@ export interface CrosswordPuzzle {
 }
 
 // Crossword canister IDL
-const crosswordIdlFactory = ({ IDL }: { IDL: typeof IDL }) => {
+const crosswordIdlFactory = ({ IDL }: { IDL: any }) => {
   const PuzzleDifficulty = IDL.Variant({
     'Easy': IDL.Null,
     'Medium': IDL.Null,

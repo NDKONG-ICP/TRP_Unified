@@ -70,6 +70,14 @@ export interface ChatMessage {
   'role' : string,
   'timestamp' : bigint,
 }
+/**
+ * HALO document processing types
+ */
+export type CitationFormat = { 'APA' : null } |
+  { 'MLA' : null } |
+  { 'Chicago' : null } |
+  { 'IEEE' : null } |
+  { 'Harvard' : null };
 export interface Config {
   'llm_providers' : [] | [Array<LLMProviderConfig>],
   'total_agents_minted' : bigint,
@@ -81,6 +89,45 @@ export interface Config {
   'btc_address' : string,
   'next_token_id' : bigint,
   'paused' : boolean,
+}
+export interface CrosswordClue {
+  'direction' : string,
+  'clue' : string,
+  'difficulty' : PuzzleDifficulty,
+  'answer' : string,
+  'number' : number,
+}
+export interface CrosswordPuzzle {
+  'id' : string,
+  'theme' : string,
+  'title' : string,
+  'answers' : Array<[number, number, string]>,
+  'difficulty' : PuzzleDifficulty,
+  'clues' : Array<CrosswordClue>,
+  'grid_size' : number,
+  'created_at' : bigint,
+  'rewards_harlee' : bigint,
+  'rewards_xp' : number,
+  'ai_generated' : boolean,
+}
+export interface GrammarSuggestion {
+  'text' : string,
+  'suggestion' : string,
+  'suggestion_type' : string,
+}
+export interface HALOOptions {
+  'generate_citations' : boolean,
+  'check_plagiarism' : boolean,
+  'grammar_check' : boolean,
+  'rewrite' : boolean,
+}
+export interface HALOResult {
+  'citations_added' : number,
+  'works_cited' : Array<string>,
+  'grammar_suggestions' : Array<GrammarSuggestion>,
+  'plagiarism_check' : [] | [PlagiarismCheckResult],
+  'formatted_text' : string,
+  'original_text' : string,
 }
 export interface KnowledgeNode {
   'id' : string,
@@ -134,6 +181,7 @@ export interface NewsArticle {
   'tags' : Array<string>,
   'published_at' : bigint,
   'seo_title' : string,
+  'author_principal' : [] | [Principal],
   'likes' : bigint,
   'seo_keywords' : Array<string>,
   'excerpt' : string,
@@ -179,6 +227,22 @@ export type PaymentToken = { 'BOB' : null } |
   { 'CkBTC' : null } |
   { 'CkETH' : null } |
   { 'CkSOL' : null };
+export interface PlagiarismCheckResult {
+  'matches' : Array<PlagiarismMatch>,
+  'plagiarism_percentage' : number,
+  'is_plagiarized' : boolean,
+}
+export interface PlagiarismMatch {
+  'matched_text' : string,
+  'author' : [] | [string],
+  'source_url' : string,
+  'source_title' : [] | [string],
+  'similarity_score' : number,
+  'publish_date' : [] | [string],
+}
+export type PuzzleDifficulty = { 'Easy' : null } |
+  { 'Hard' : null } |
+  { 'Medium' : null };
 export interface RavenAIAgent {
   'total_memories' : bigint,
   'short_term_memory' : Array<MemoryEntry>,
@@ -294,8 +358,18 @@ export interface _SERVICE {
     { 'Ok' : RavenNotification } |
       { 'Err' : string }
   >,
+  'admin_set_eleven_labs_api_key' : ActorMethod<
+    [string],
+    { 'Ok' : null } |
+      { 'Err' : string }
+  >,
   'admin_set_llm_api_key' : ActorMethod<
     [string, string],
+    { 'Ok' : null } |
+      { 'Err' : string }
+  >,
+  'admin_upload_axiom_wasm' : ActorMethod<
+    [Uint8Array | number[]],
     { 'Ok' : null } |
       { 'Err' : string }
   >,
@@ -341,6 +415,14 @@ export interface _SERVICE {
       { 'Err' : string }
   >,
   /**
+   * Crossword Quest Functions
+   */
+  'generate_crossword_puzzle' : ActorMethod<
+    [string, PuzzleDifficulty],
+    { 'Ok' : CrosswordPuzzle } |
+      { 'Err' : string }
+  >,
+  /**
    * Raven News AI Pipeline
    */
   'generate_daily_article' : ActorMethod<
@@ -369,9 +451,14 @@ export interface _SERVICE {
     Array<ChatMessage>
   >,
   'get_council_session' : ActorMethod<[string], [] | [AICouncilSession]>,
+  'get_crossword_puzzle' : ActorMethod<[string], [] | [CrosswordPuzzle]>,
   'get_llm_providers' : ActorMethod<[], Array<[string, boolean]>>,
   'get_payment' : ActorMethod<[string], [] | [PaymentRecord]>,
   'get_pending_notifications' : ActorMethod<[number], Array<RavenNotification>>,
+  'get_recent_crossword_puzzles' : ActorMethod<
+    [number],
+    Array<CrosswordPuzzle>
+  >,
   'get_scheduled_notifications' : ActorMethod<
     [string],
     Array<RavenNotification>
@@ -428,6 +515,14 @@ export interface _SERVICE {
     { 'Ok' : MintResult } |
       { 'Err' : string }
   >,
+  /**
+   * HALO document processing
+   */
+  'process_halo_document' : ActorMethod<
+    [Uint8Array | number[], string, CitationFormat, HALOOptions],
+    { 'Ok' : HALOResult } |
+      { 'Err' : string }
+  >,
   'process_scheduled_notifications' : ActorMethod<
     [],
     { 'Ok' : number } |
@@ -448,6 +543,11 @@ export interface _SERVICE {
   >,
   'query_shared_memories' : ActorMethod<[string, number], Array<SharedMemory>>,
   'recall_memories' : ActorMethod<[bigint, string, number], Array<MemoryEntry>>,
+  'regenerate_article' : ActorMethod<
+    [bigint, [] | [ArticlePersona], [] | [string]],
+    { 'Ok' : NewsArticle } |
+      { 'Err' : string }
+  >,
   'renew_subscription' : ActorMethod<
     [string],
     { 'Ok' : Subscription } |
@@ -516,6 +616,11 @@ export interface _SERVICE {
   'upload_axiom_document' : ActorMethod<
     [bigint, string, Uint8Array | number[], string],
     { 'Ok' : string } |
+      { 'Err' : string }
+  >,
+  'verify_crossword_solution' : ActorMethod<
+    [string, Array<[number, number, string]>],
+    { 'Ok' : [boolean, bigint, number] } |
       { 'Err' : string }
   >,
 }

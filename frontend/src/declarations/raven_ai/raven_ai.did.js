@@ -113,12 +113,38 @@ export const idlFactory = ({ IDL }) => {
     'tags' : IDL.Vec(IDL.Text),
     'published_at' : IDL.Nat64,
     'seo_title' : IDL.Text,
+    'author_principal' : IDL.Opt(IDL.Principal),
     'likes' : IDL.Nat64,
     'seo_keywords' : IDL.Vec(IDL.Text),
     'excerpt' : IDL.Text,
     'category' : IDL.Text,
     'seo_description' : IDL.Text,
     'author_persona' : ArticlePersona,
+  });
+  const PuzzleDifficulty = IDL.Variant({
+    'Easy' : IDL.Null,
+    'Hard' : IDL.Null,
+    'Medium' : IDL.Null,
+  });
+  const CrosswordClue = IDL.Record({
+    'direction' : IDL.Text,
+    'clue' : IDL.Text,
+    'difficulty' : PuzzleDifficulty,
+    'answer' : IDL.Text,
+    'number' : IDL.Nat32,
+  });
+  const CrosswordPuzzle = IDL.Record({
+    'id' : IDL.Text,
+    'theme' : IDL.Text,
+    'title' : IDL.Text,
+    'answers' : IDL.Vec(IDL.Tuple(IDL.Nat32, IDL.Nat32, IDL.Text)),
+    'difficulty' : PuzzleDifficulty,
+    'clues' : IDL.Vec(CrosswordClue),
+    'grid_size' : IDL.Nat32,
+    'created_at' : IDL.Nat64,
+    'rewards_harlee' : IDL.Nat64,
+    'rewards_xp' : IDL.Nat32,
+    'ai_generated' : IDL.Bool,
   });
   const AxiomNFT = IDL.Record({
     'dedicated_canister' : IDL.Opt(IDL.Principal),
@@ -222,6 +248,45 @@ export const idlFactory = ({ IDL }) => {
     'cycles_allocated' : IDL.Nat,
     'payment_token' : PaymentToken,
   });
+  const CitationFormat = IDL.Variant({
+    'APA' : IDL.Null,
+    'MLA' : IDL.Null,
+    'Chicago' : IDL.Null,
+    'IEEE' : IDL.Null,
+    'Harvard' : IDL.Null,
+  });
+  const HALOOptions = IDL.Record({
+    'generate_citations' : IDL.Bool,
+    'check_plagiarism' : IDL.Bool,
+    'grammar_check' : IDL.Bool,
+    'rewrite' : IDL.Bool,
+  });
+  const GrammarSuggestion = IDL.Record({
+    'text' : IDL.Text,
+    'suggestion' : IDL.Text,
+    'suggestion_type' : IDL.Text,
+  });
+  const PlagiarismMatch = IDL.Record({
+    'matched_text' : IDL.Text,
+    'author' : IDL.Opt(IDL.Text),
+    'source_url' : IDL.Text,
+    'source_title' : IDL.Opt(IDL.Text),
+    'similarity_score' : IDL.Float32,
+    'publish_date' : IDL.Opt(IDL.Text),
+  });
+  const PlagiarismCheckResult = IDL.Record({
+    'matches' : IDL.Vec(PlagiarismMatch),
+    'plagiarism_percentage' : IDL.Float32,
+    'is_plagiarized' : IDL.Bool,
+  });
+  const HALOResult = IDL.Record({
+    'citations_added' : IDL.Nat32,
+    'works_cited' : IDL.Vec(IDL.Text),
+    'grammar_suggestions' : IDL.Vec(GrammarSuggestion),
+    'plagiarism_check' : IDL.Opt(PlagiarismCheckResult),
+    'formatted_text' : IDL.Text,
+    'original_text' : IDL.Text,
+  });
   const SharedMemory = IDL.Record({
     'id' : IDL.Text,
     'content' : IDL.Text,
@@ -279,8 +344,18 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'Ok' : RavenNotification, 'Err' : IDL.Text })],
         [],
       ),
+    'admin_set_eleven_labs_api_key' : IDL.Func(
+        [IDL.Text],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text })],
+        [],
+      ),
     'admin_set_llm_api_key' : IDL.Func(
         [IDL.Text, IDL.Text],
+        [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text })],
+        [],
+      ),
+    'admin_upload_axiom_wasm' : IDL.Func(
+        [IDL.Vec(IDL.Nat8)],
         [IDL.Variant({ 'Ok' : IDL.Null, 'Err' : IDL.Text })],
         [],
       ),
@@ -324,6 +399,11 @@ export const idlFactory = ({ IDL }) => {
     'distribute_article_harlee_rewards' : IDL.Func(
         [IDL.Nat64, IDL.Principal, IDL.Nat64],
         [IDL.Variant({ 'Ok' : IDL.Nat64, 'Err' : IDL.Text })],
+        [],
+      ),
+    'generate_crossword_puzzle' : IDL.Func(
+        [IDL.Text, PuzzleDifficulty],
+        [IDL.Variant({ 'Ok' : CrosswordPuzzle, 'Err' : IDL.Text })],
         [],
       ),
     'generate_daily_article' : IDL.Func(
@@ -371,6 +451,11 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Opt(AICouncilSession)],
         ['query'],
       ),
+    'get_crossword_puzzle' : IDL.Func(
+        [IDL.Text],
+        [IDL.Opt(CrosswordPuzzle)],
+        ['query'],
+      ),
     'get_llm_providers' : IDL.Func(
         [],
         [IDL.Vec(IDL.Tuple(IDL.Text, IDL.Bool))],
@@ -380,6 +465,11 @@ export const idlFactory = ({ IDL }) => {
     'get_pending_notifications' : IDL.Func(
         [IDL.Nat32],
         [IDL.Vec(RavenNotification)],
+        ['query'],
+      ),
+    'get_recent_crossword_puzzles' : IDL.Func(
+        [IDL.Nat32],
+        [IDL.Vec(CrosswordPuzzle)],
         ['query'],
       ),
     'get_scheduled_notifications' : IDL.Func(
@@ -435,6 +525,11 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Variant({ 'Ok' : MintResult, 'Err' : IDL.Text })],
         [],
       ),
+    'process_halo_document' : IDL.Func(
+        [IDL.Vec(IDL.Nat8), IDL.Text, CitationFormat, HALOOptions],
+        [IDL.Variant({ 'Ok' : HALOResult, 'Err' : IDL.Text })],
+        [],
+      ),
     'process_scheduled_notifications' : IDL.Func(
         [],
         [IDL.Variant({ 'Ok' : IDL.Nat32, 'Err' : IDL.Text })],
@@ -459,6 +554,11 @@ export const idlFactory = ({ IDL }) => {
         [IDL.Nat64, IDL.Text, IDL.Nat32],
         [IDL.Vec(MemoryEntry)],
         ['query'],
+      ),
+    'regenerate_article' : IDL.Func(
+        [IDL.Nat64, IDL.Opt(ArticlePersona), IDL.Opt(IDL.Text)],
+        [IDL.Variant({ 'Ok' : NewsArticle, 'Err' : IDL.Text })],
+        [],
       ),
     'renew_subscription' : IDL.Func(
         [IDL.Text],
@@ -523,6 +623,16 @@ export const idlFactory = ({ IDL }) => {
     'upload_axiom_document' : IDL.Func(
         [IDL.Nat64, IDL.Text, IDL.Vec(IDL.Nat8), IDL.Text],
         [IDL.Variant({ 'Ok' : IDL.Text, 'Err' : IDL.Text })],
+        [],
+      ),
+    'verify_crossword_solution' : IDL.Func(
+        [IDL.Text, IDL.Vec(IDL.Tuple(IDL.Nat32, IDL.Nat32, IDL.Text))],
+        [
+          IDL.Variant({
+            'Ok' : IDL.Tuple(IDL.Bool, IDL.Nat64, IDL.Nat32),
+            'Err' : IDL.Text,
+          }),
+        ],
         [],
       ),
   });

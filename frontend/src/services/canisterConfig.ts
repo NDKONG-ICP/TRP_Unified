@@ -26,8 +26,8 @@ export const CANISTER_IDS = {
   axiom_3: '4ckzx-kiaaa-aaaao-a4xsa-cai',
   axiom_4: '4fl7d-hqaaa-aaaao-a4xsq-cai',
   axiom_5: '4miu7-ryaaa-aaaao-a4xta-cai',
-  // IC SPICY canister
-  icspicy: import.meta.env.VITE_ICSPICY_CANISTER_ID || 'js4ab-kqaaa-aaaao-a4ynq-cai',
+  // IC SPICY canister (Flagship RWA)
+  icspicy: import.meta.env.VITE_ICSPICY_CANISTER_ID || 'vmcfj-haaaa-aaaao-a4o3q-cai',
   // Multi-chain authentication canisters
   siwe_canister: import.meta.env.VITE_SIWE_CANISTER_ID || 'ehdei-liaaa-aaaao-a4zfa-cai',
   siws_canister: import.meta.env.VITE_SIWS_CANISTER_ID || 'eacc4-gqaaa-aaaao-a4zfq-cai',
@@ -45,6 +45,9 @@ export const CK_TOKEN_CANISTERS = {
   ckETH: 'ss2fx-dyaaa-aaaar-qacoq-cai',
   ckUSDC: 'xevnm-gaaaa-aaaar-qafnq-cai',
 } as const;
+
+// ICPay Configuration
+export const ICPAY_PUBLISHABLE_KEY = 'pk_live_55Z2W9X8Y7Z6A5B4C3D2E1'; // Updated from user query
 
 // Detect if we're on mainnet
 export const isMainnet = (): boolean => {

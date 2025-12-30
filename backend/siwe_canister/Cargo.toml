@@ -17,6 +17,9 @@ sha3 = { workspace = true }
 hex = { workspace = true }
 sha2 = { workspace = true }
 getrandom = { workspace = true }
+k256 = { workspace = true }
+libsecp256k1 = { workspace = true }
+siwe = { workspace = true }
 
 [profile.release]
 lto = true

@@ -166,9 +166,12 @@ export default function ClaimPage() {
         const metadata = await ICSpicyMintService.getNFTMetadata(tokenId);
         
         // Use metadata rarity if available, otherwise fallback
-        let rarity: 'common' | 'rare' | 'epic' | 'legendary' = 'common';
+        let rarity: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary' = 'common';
         if (metadata?.rarity) {
-          rarity = metadata.rarity;
+          const r = (metadata.rarity as any) as string;
+          if (['common', 'uncommon', 'rare', 'epic', 'legendary'].includes(r)) {
+            rarity = r as any;
+          }
         } else {
           const rarityIndex = Number(tokenId) % 4;
           const rarities = ['common', 'rare', 'epic', 'legendary'] as const;

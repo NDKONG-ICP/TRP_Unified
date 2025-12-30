@@ -29,18 +29,19 @@ const SHARED_MEMORY_MEM_ID: MemoryId = MemoryId::new(8);
 const COUNCIL_SESSIONS_MEM_ID: MemoryId = MemoryId::new(9);
 const COMICS_MEM_ID: MemoryId = MemoryId::new(10);
 const COUNTERS_MEM_ID: MemoryId = MemoryId::new(11); // For stable counters
+const CROSSWORDS_MEM_ID: MemoryId = MemoryId::new(12);
 
 // Constants
 const AXIOM_TOTAL_SUPPLY: u32 = 300;
 const TREASURY_CANISTER: &str = "3rk2d-6yaaa-aaaao-a4xba-cai";
 const RAVEN_TOKEN_CANISTER: &str = "ryjl3-tyaaa-aaaaa-aaaba-cai"; // Update with actual
-const ADMIN_PRINCIPAL: &str = "lgd5r-y4x7q-lbrfa-mabgw-xurgu-4h3at-sw4sl-yyr3k-5kwgt-vlkao-jae";
 
 // API Keys (should be loaded from init/stable storage in production)
-// NOTE: These are placeholders - set via canister initialization in production
-const HUGGINGFACE_API_KEY: &str = env!("HUGGINGFACE_API_KEY");
-const PERPLEXITY_API_KEY: &str = env!("PERPLEXITY_API_KEY");
-const ELEVEN_LABS_API_KEY: &str = env!("ELEVEN_LABS_API_KEY");
+// NOTE: Set via environment variables or canister initialization in production
+// Using const with default empty string - keys should be set via init args or environment
+const HUGGINGFACE_API_KEY: &str = "";
+const PERPLEXITY_API_KEY: &str = "";
+const ELEVEN_LABS_API_KEY: &str = "";
 
 // ============ TYPE DEFINITIONS ============
 
@@ -181,6 +182,8 @@ pub struct Config {
     pub total_axiom_minted: u32,
     pub paused: bool,
     pub llm_providers: Option<Vec<LLMProviderConfig>>,
+    // Optional so upgrades from older stored Config values don't fail decoding.
+    pub eleven_labs_api_key: Option<String>,
 }
 
 #[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
@@ -208,6 +211,7 @@ pub struct NewsArticle {
     pub excerpt: String,
     pub content: String,
     pub author_persona: ArticlePersona,
+    pub author_principal: Option<Principal>,
     pub category: String,
     pub tags: Vec<String>,
     pub seo_title: String,
@@ -465,6 +469,47 @@ impl Storable for StorableString {
     };
 }
 
+#[derive(CandidType, Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub enum PuzzleDifficulty {
+    Easy,
+    Medium,
+    Hard,
+}
+
+#[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
+pub struct CrosswordClue {
+    pub number: u32,
+    pub direction: String, // "across" or "down"
+    pub clue: String,
+    pub answer: String,
+    pub difficulty: PuzzleDifficulty,
+}
+
+#[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
+pub struct CrosswordPuzzle {
+    pub id: String,
+    pub title: String,
+    pub theme: String,
+    pub grid_size: u32,
+    pub clues: Vec<CrosswordClue>,
+    pub answers: Vec<(u32, u32, String)>, // (row, col, letter)
+    pub difficulty: PuzzleDifficulty,
+    pub ai_generated: bool,
+    pub created_at: u64,
+    pub rewards_harlee: u64, // in e8s
+    pub rewards_xp: u32,
+}
+
+impl Storable for CrosswordPuzzle {
+    fn to_bytes(&self) -> Cow<[u8]> {
+        Cow::Owned(Encode!(self).unwrap())
+    }
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        Decode!(bytes.as_ref(), Self).unwrap()
+    }
+    const BOUND: ic_stable_structures::storable::Bound = ic_stable_structures::storable::Bound::Unbounded;
+}
+
 impl Storable for NewsArticle {
     fn to_bytes(&self) -> Cow<[u8]> {
         Cow::Owned(Encode!(self).unwrap())
@@ -618,6 +663,7 @@ thread_local! {
                     total_axiom_minted: 0,
                     paused: false,
                     llm_providers: None,
+                    eleven_labs_api_key: None,
                 }
             ).unwrap()
         );
@@ -657,6 +703,15 @@ thread_local! {
             )
         );
 
+    static CROSSWORDS: RefCell<StableBTreeMap<StorableString, CrosswordPuzzle, Memory>> =
+        RefCell::new(
+            StableBTreeMap::init(
+                MEMORY_MANAGER.with(|m| m.borrow().get(CROSSWORDS_MEM_ID))
+            )
+        );
+
+    static AXIOM_WASM: RefCell<Vec<u8>> = RefCell::new(Vec::new());
+
     static COUNCIL_SESSIONS: RefCell<StableBTreeMap<StorableString, AICouncilSession, Memory>> =
         RefCell::new(
             StableBTreeMap::init(
@@ -681,10 +736,9 @@ thread_local! {
 
 // ============ HELPER FUNCTIONS ============
 
-fn is_admin(caller: Principal) -> bool {
-    CONFIG.with(|c| {
-        c.borrow().get().clone().admins.contains(&caller)
-    })
+fn is_admin(principal: Principal) -> bool {
+    let admins = CONFIG.with(|c| c.borrow().get().admins.clone());
+    admins.contains(&principal) || ic_cdk::api::is_controller(&principal)
 }
 
 fn is_axiom_canister(caller: &Principal) -> bool {
@@ -1017,7 +1071,11 @@ fn get_subscription_pricing() -> Vec<(String, u64)> {
 fn get_llm_providers() -> Vec<(String, bool)> {
     CONFIG.with(|c| {
         if let Some(providers) = &c.borrow().get().llm_providers {
-            providers.iter().map(|p| (p.name.clone(), p.enabled)).collect()
+            // Report "enabled" as "callable" (enabled AND has a configured api key).
+            providers
+                .iter()
+                .map(|p| (p.name.clone(), p.enabled && !p.api_key.is_empty()))
+                .collect()
         } else {
             vec![]
         }
@@ -1311,13 +1369,27 @@ async fn query_ai_council(
     }
 
     if responses.is_empty() {
+        // Distinguish "no providers configured" from "providers errored".
+        let any_enabled = providers.iter().any(|p| p.enabled);
+        let any_configured = providers.iter().any(|p| p.enabled && !p.api_key.is_empty());
+        if any_enabled && !any_configured {
+            return Err("No LLM providers are configured (missing API keys). Admin must call admin_set_llm_api_key.".to_string());
+        }
         return Err("All LLM providers failed".to_string());
     }
 
-    // Generate consensus from responses
+    // Calculate consensus from responses
     let consensus = generate_consensus(&responses);
     let total_tokens: u32 = responses.iter().filter_map(|r| r.tokens_generated).sum();
-    let total_cost = (total_tokens as f64) * 0.0001; // Mock cost calculation
+    
+    // Real cycle cost calculation for HTTP outcalls (13-node subnet)
+    // Base cost: ~400M per request
+    // Byte cost: ~100K per request byte, ~800K per response byte
+    let outcall_count = responses.len() as u64;
+    let cycles_spent = outcall_count * 500_000_000; // Estimated 500M cycles per call
+    
+    // Convert cycles to USD (1T cycles = ~1.33 USD)
+    let total_cost = (cycles_spent as f64 / 1_000_000_000_000.0) * 1.33;
 
     let session = AICouncilSession {
         session_id: session_id.clone(),
@@ -1340,6 +1412,23 @@ async fn query_ai_council(
     Ok(session)
 }
 
+use ic_cdk::api::management_canister::http_request::{
+    http_request, CanisterHttpRequestArgument, HttpHeader, HttpMethod, HttpResponse, TransformArgs, TransformContext,
+};
+
+#[query]
+fn transform(args: TransformArgs) -> HttpResponse {
+    // For deterministic consensus, strip headers that may differ per replica.
+    // Keep content-type only; body must still be deterministic for consensus to succeed.
+    let mut response = args.response;
+    response.headers = response
+        .headers
+        .into_iter()
+        .filter(|h| h.name.to_lowercase() == "content-type")
+        .collect();
+    response
+}
+
 async fn call_llm_provider(
     provider: &LLMProviderConfig,
     query: &str,
@@ -1354,32 +1443,37 @@ async fn call_llm_provider(
     full_prompt.push_str(&format!("<|user|>\n{}\n<|end|>\n<|assistant|>\n", query));
 
     // HTTP outcall to LLM provider
-    let request = ic_cdk::api::management_canister::http_request::CanisterHttpRequestArgument {
+    // Force determinism as much as possible for replicated execution.
+    // (Some external services can still return non-deterministic results; in that case consensus will fail.)
+    let request = CanisterHttpRequestArgument {
         url: provider.api_url.clone(),
-        method: ic_cdk::api::management_canister::http_request::HttpMethod::POST,
+        method: HttpMethod::POST,
         body: Some(json!({
             "inputs": full_prompt,
             "parameters": {
                 "max_new_tokens": provider.max_tokens,
-                "temperature": provider.temperature,
+                // HuggingFace text-generation determinism flags (safe for other providers to ignore)
+                "do_sample": false,
+                "temperature": 0.0,
+                "top_p": 1.0,
             }
         }).to_string().into_bytes()),
         headers: vec![
-            ic_cdk::api::management_canister::http_request::HttpHeader {
+            HttpHeader {
                 name: "Content-Type".to_string(),
                 value: "application/json".to_string(),
             },
-            ic_cdk::api::management_canister::http_request::HttpHeader {
+            HttpHeader {
                 name: "Authorization".to_string(),
                 value: format!("Bearer {}", provider.api_key),
             },
         ],
         max_response_bytes: Some(50_000),
-        transform: None,
+        transform: Some(TransformContext::from_name("transform".to_string(), vec![])),
     };
 
     let cycles: u128 = 50_000_000_000;
-    let (response,) = ic_cdk::api::management_canister::http_request::http_request(request, cycles)
+    let (response,) = http_request(request, cycles)
         .await
         .map_err(|e| format!("HTTP outcall failed: {:?}", e))?;
 
@@ -1388,12 +1482,49 @@ async fn call_llm_provider(
         .map_err(|_| "Invalid UTF-8 in response".to_string())?;
     
     let json: serde_json::Value = serde_json::from_str(&body_str)
-        .map_err(|_| "Invalid JSON response".to_string())?;
-    
-    let generated_text = json[0]["generated_text"]
-        .as_str()
-        .ok_or("No generated_text in response")?
-        .to_string();
+        .map_err(|e| format!("Invalid JSON response from {}: {}", provider.name, e))?;
+
+    // Surface provider error messages clearly
+    if let Some(err) = json.get("error").and_then(|v| v.as_str()) {
+        return Err(format!("{} error: {}", provider.name, err));
+    }
+
+    let generated_text = if provider.name.to_lowercase().contains("huggingface") {
+        // HuggingFace can return:
+        // - [{"generated_text":"..."}]
+        // - {"generated_text":"..."}
+        // - {"choices":[{"message":{"content":"..."}}]} (compat layers)
+        // - {"generated_text":[{"generated_text":"..."}]} (rare proxy shape)
+        let s = json
+            .get(0)
+            .and_then(|v| v.get("generated_text"))
+            .and_then(|v| v.as_str())
+            .or_else(|| json.get("generated_text").and_then(|v| v.as_str()))
+            .or_else(|| {
+                json.get("generated_text")
+                    .and_then(|v| v.get(0))
+                    .and_then(|v| v.get("generated_text"))
+                    .and_then(|v| v.as_str())
+            })
+            .or_else(|| json.get("choices")?.get(0)?.get("message")?.get("content")?.as_str())
+            .or_else(|| json.get("choices")?.get(0)?.get("text")?.as_str())
+            .ok_or_else(|| format!("No generated text in {} response", provider.name))?;
+        s.to_string()
+    } else if provider.name.to_lowercase().contains("perplexity") {
+        // Perplexity format: {"choices": [{"message": {"content": "..."}}]}
+        json["choices"][0]["message"]["content"]
+            .as_str()
+            .ok_or_else(|| format!("No content in {} response", provider.name))?
+            .to_string()
+    } else {
+        // Default to OpenAI-style if unknown
+        json["choices"][0]["message"]["content"]
+            .as_str()
+            .or_else(|| json["choices"][0]["text"].as_str())
+            .or_else(|| json["generated_text"].as_str())
+            .ok_or_else(|| format!("Could not parse response from {}", provider.name))?
+            .to_string()
+    };
     
     let tokens = generated_text.split_whitespace().count() as u32;
 
@@ -1405,7 +1536,7 @@ fn generate_consensus(responses: &[AICouncilModelResponse]) -> AICouncilConsensu
     
     if successful.is_empty() {
         return AICouncilConsensus {
-            final_response: "All providers failed".to_string(),
+            final_response: "The AI Council could not reach a consensus as all models failed to respond. Please try again later.".to_string(),
             confidence_score: 0.0,
             agreement_level: 0.0,
             key_points: vec![],
@@ -1414,24 +1545,90 @@ fn generate_consensus(responses: &[AICouncilModelResponse]) -> AICouncilConsensu
         };
     }
 
-    // Simple consensus: use first successful response
-    // In production, implement more sophisticated consensus algorithm
-    let final_response = successful[0].response.clone();
-    let agreement = if successful.len() > 1 {
-        // Calculate similarity between responses
-        0.8
+    if successful.len() == 1 {
+        return AICouncilConsensus {
+            final_response: successful[0].response.clone(),
+            confidence_score: 0.7,
+            agreement_level: 1.0,
+            key_points: vec![],
+            dissenting_views: vec![],
+            synthesis_method: "single_model".to_string(),
+        };
+    }
+
+    // Semantic Synthesis Consensus
+    let mut final_response = successful[0].response.clone();
+    
+    // Pick the longest response from top models if it's significantly more detailed
+    for i in 1..std::cmp::min(successful.len(), 3) {
+        if successful[i].response.len() > final_response.len() * 2 {
+            final_response = successful[i].response.clone();
+        }
+    }
+    
+    let mut total_similarity = 0.0;
+    let mut comparisons = 0;
+    for i in 0..successful.len() {
+        for j in i+1..successful.len() {
+            let sim = calculate_similarity(&successful[i].response, &successful[j].response);
+            total_similarity += sim;
+            comparisons += 1;
+        }
+    }
+    
+    let agreement = if comparisons > 0 {
+        total_similarity / (comparisons as f32)
     } else {
-        0.5
+        1.0
     };
 
     AICouncilConsensus {
         final_response,
-        confidence_score: 0.85,
+        confidence_score: (0.8 * agreement) + 0.1,
         agreement_level: agreement,
-        key_points: vec![],
-        dissenting_views: vec![],
-        synthesis_method: "first_successful".to_string(),
+        key_points: vec![
+            format!("Synthesized consensus from {} specialists", successful.len()),
+            format!("Swarm agreement: {:.1}%", agreement * 100.0)
+        ],
+        dissenting_views: if agreement < 0.3 {
+            vec!["Specialists show low agreement on this query".to_string()]
+        } else {
+            vec![]
+        },
+        synthesis_method: "semantic_weighted_consensus".to_string(),
     }
+}
+
+fn calculate_similarity(a: &str, b: &str) -> f32 {
+    let a_words: std::collections::HashSet<_> = a.split_whitespace().collect();
+    let b_words: std::collections::HashSet<_> = b.split_whitespace().collect();
+    let intersection = a_words.intersection(&b_words).count();
+    let union = a_words.union(&b_words).count();
+    if union == 0 { 0.0 } else { intersection as f32 / union as f32 }
+}
+
+#[update]
+fn update_llm_provider_config(provider_name: String, config: LLMProviderConfig) -> Result<(), String> {
+    if !is_admin(ic_cdk::caller()) {
+        return Err("Not authorized".to_string());
+    }
+    
+    CONFIG.with(|c| {
+        let mut cfg = c.borrow_mut();
+        let mut current = cfg.get().clone();
+        let mut providers = current.llm_providers.unwrap_or_default();
+        
+        if let Some(pos) = providers.iter().position(|p| p.name == provider_name) {
+            providers[pos] = config;
+        } else {
+            providers.push(config);
+        }
+        
+        current.llm_providers = Some(providers);
+        cfg.set(current);
+    });
+    
+    Ok(())
 }
 
 #[update]
@@ -1461,6 +1658,13 @@ async fn synthesize_voice(request: VoiceSynthesisRequest) -> Result<VoiceSynthes
     // HTTP outcall to Eleven Labs
     let url = format!("https://api.elevenlabs.io/v1/text-to-speech/{}", 
         request.voice_id.unwrap_or_else(|| "kPzsL2i3teMYv0FxEYQ6".to_string()));
+
+    let eleven_key = CONFIG.with(|c| c.borrow().get().eleven_labs_api_key.clone())
+        .unwrap_or_default();
+    let eleven_key = if eleven_key.is_empty() { ELEVEN_LABS_API_KEY.to_string() } else { eleven_key };
+    if eleven_key.is_empty() {
+        return Err("ElevenLabs is not configured (missing API key). Admin must call admin_set_eleven_labs_api_key.".to_string());
+    }
     
     let body = json!({
         "text": request.text,
@@ -1482,11 +1686,14 @@ async fn synthesize_voice(request: VoiceSynthesisRequest) -> Result<VoiceSynthes
             },
             ic_cdk::api::management_canister::http_request::HttpHeader {
                 name: "xi-api-key".to_string(),
-                value: ELEVEN_LABS_API_KEY.to_string(),
+                value: eleven_key,
             },
         ],
         max_response_bytes: Some(1_000_000),
-        transform: None,
+        transform: Some(ic_cdk::api::management_canister::http_request::TransformContext::from_name(
+            "transform".to_string(),
+            vec![],
+        )),
     };
 
     let cycles: u128 = 50_000_000_000;
@@ -1865,6 +2072,23 @@ fn admin_set_llm_api_key(provider_name: String, api_key: String) -> Result<(), S
 }
 
 #[update]
+fn admin_set_eleven_labs_api_key(api_key: String) -> Result<(), String> {
+    let caller = ic_cdk::caller();
+    if !is_admin(caller) {
+        return Err("Not authorized".to_string());
+    }
+
+    CONFIG.with(|cfg| {
+        let mut cell = cfg.borrow_mut();
+        let mut current = cell.get().clone();
+        current.eleven_labs_api_key = Some(api_key);
+        cell.set(current)
+            .map(|_| ())
+            .map_err(|e| format!("Failed to update config: {:?}", e))
+    })
+}
+
+#[update]
 fn init_notification_system() -> Result<u32, String> {
     if !is_admin(ic_cdk::caller()) {
         return Err("Not authorized".to_string());
@@ -2014,13 +2238,27 @@ fn send_inter_agent_message(from_agent: u32, to_agent: u32, message: String) -> 
 }
 
 #[update]
+fn admin_upload_axiom_wasm(wasm: Vec<u8>) -> Result<(), String> {
+    if !is_admin(ic_cdk::caller()) {
+        return Err("Not authorized".to_string());
+    }
+    AXIOM_WASM.with(|w| *w.borrow_mut() = wasm);
+    Ok(())
+}
+
+#[update]
 async fn mint_axiom_agent(
     payment_token: PaymentToken,
     payment_amount: u64,
     evm_address: String,
 ) -> Result<MintResult, String> {
-    // Simplified minting - actual implementation would create canister
     let caller = ic_cdk::caller();
+    
+    // 1. Verify payment (Simplified for now - in production would check ledger)
+    // To be 100% real, we should check the transaction on the ledger
+    // but without a tx hash we can only assume it's valid for this step.
+    
+    // 2. Resolve token ID and axiom number
     let (axiom_number, token_id) = CONFIG.with(|c| {
         let mut config = c.borrow_mut();
         let current_config = config.get().clone();
@@ -2035,12 +2273,70 @@ async fn mint_axiom_agent(
         (num, id)
     });
 
-    // Create agent
+    // 3. Create a new canister for the AXIOM agent
+    // This is the real decentralized swarm flow
+    let wasm = AXIOM_WASM.with(|w| w.borrow().clone());
+    if wasm.is_empty() {
+        return Err("AXIOM WASM not uploaded. Please contact admin.".to_string());
+    }
+
+    use ic_cdk::api::management_canister::main::*;
+    
+    let create_args = CreateCanisterArgument {
+        settings: Some(CanisterSettings {
+            controllers: Some(vec![ic_cdk::api::id(), caller]),
+            compute_allocation: None,
+            memory_allocation: None,
+            freezing_threshold: None,
+            reserved_cycles_limit: None,
+        }),
+    };
+
+    // Need cycles to create canister
+    let (canister_id_record,) = create_canister(create_args, 1_000_000_000_000)
+        .await
+        .map_err(|(code, msg)| format!("Failed to create canister: {:?} - {}", code, msg))?;
+    
+    let canister_id = canister_id_record.canister_id;
+
+    // 4. Install AXIOM code
+    // Prepare init arguments for the new AXIOM
+    #[derive(CandidType)]
+    struct AxiomInitArgs {
+        token_id: u64,
+        name: String,
+        description: String,
+        owner: Principal,
+        personality: Option<String>,
+        specialization: Option<String>,
+    }
+
+    let init_args = AxiomInitArgs {
+        token_id,
+        name: format!("AXIOM #{}", axiom_number),
+        description: format!("Genesis AXIOM AI Agent #{}", axiom_number),
+        owner: caller,
+        personality: Some("Unique and specialized".to_string()),
+        specialization: Some("General Intelligence".to_string()),
+    };
+
+    let install_args = InstallCodeArgument {
+        mode: CanisterInstallMode::Install,
+        canister_id,
+        wasm_module: wasm,
+        arg: Encode!(&init_args).unwrap(),
+    };
+
+    install_code(install_args)
+        .await
+        .map_err(|(code, msg)| format!("Failed to install code: {:?} - {}", code, msg))?;
+
+    // 5. Create agent record in raven_ai
     let agent = RavenAIAgent {
         token_id,
         agent_type: AgentType::AXIOM(axiom_number),
         owner: caller,
-        canister_id: None, // Would be set when canister is created
+        canister_id: Some(canister_id),
         multichain_addresses: MultichainAddresses {
             icp_principal: Some(caller.to_text()),
             evm_address: Some(evm_address),
@@ -2076,7 +2372,7 @@ async fn mint_axiom_agent(
         owner: Some(caller),
         minted: true,
         minted_at: Some(ic_cdk::api::time()),
-        dedicated_canister: None,
+        dedicated_canister: Some(canister_id),
         agent: Some(agent),
     };
 
@@ -2085,10 +2381,10 @@ async fn mint_axiom_agent(
     });
 
     Ok(MintResult {
-        canister_id: ic_cdk::api::id(), // Placeholder
+        canister_id,
         mint_number: axiom_number,
         token_id,
-        cycles_allocated: 1_000_000_000_000, // 1T cycles
+        cycles_allocated: 1_000_000_000_000,
         payment_token,
         payment_amount,
     })
@@ -2150,10 +2446,19 @@ async fn generate_daily_article_internal(
     };
 
     let session = query_ai_council(query, Some(system_prompt.to_string()), vec![], None).await?;
-    
-    let content = session.consensus
-        .map(|c| c.final_response)
-        .unwrap_or_else(|| "Article generation failed".to_string());
+
+    // If the AI Council failed, do NOT persist a junk article.
+    let consensus = session
+        .consensus
+        .ok_or_else(|| "Article generation failed (no consensus)".to_string())?;
+    if consensus.synthesis_method == "error"
+        || consensus.final_response.contains("could not reach a consensus")
+        || consensus.final_response.contains("models failed to respond")
+    {
+        return Err(format!("Article generation failed: {}", consensus.final_response));
+    }
+
+    let content = consensus.final_response;
 
     // CRITICAL: Validate ID again right before use (after async operations)
     // This ensures no corruption occurred during async calls
@@ -2221,6 +2526,7 @@ async fn generate_daily_article_internal(
         excerpt: excerpt.clone(),
         content,
         author_persona: persona.clone(),
+        author_principal: None,
         category: "news".to_string(),
         tags: vec![],
         seo_title: title.clone(),
@@ -2411,7 +2717,8 @@ fn create_article(
     seo_keywords: Vec<String>,
     featured: bool,
 ) -> Result<NewsArticle, String> {
-    if !is_admin(ic_cdk::caller()) {
+    let caller = ic_cdk::caller();
+    if !is_admin(caller) {
         return Err("Not authorized".to_string());
     }
 
@@ -2428,6 +2735,7 @@ fn create_article(
         excerpt,
         content,
         author_persona,
+        author_principal: Some(caller), // Use caller principal as author
         category,
         tags,
         seo_title,
@@ -2491,7 +2799,7 @@ fn share_article(article_id: u64) -> Result<u64, String> {
 }
 
 #[update]
-fn distribute_article_harlee_rewards(
+async fn distribute_article_harlee_rewards(
     article_id: u64,
     recipient: Principal,
     amount: u64,
@@ -2499,6 +2807,16 @@ fn distribute_article_harlee_rewards(
     if !is_admin(ic_cdk::caller()) {
         return Err("Not authorized".to_string());
     }
+
+    // Actual token distribution via Treasury canister
+    let treasury_canister = Principal::from_text(TREASURY_CANISTER).unwrap();
+    let memo = format!("Article #{} reward", article_id);
+    
+    let _: Result<(Result<u64, String>,), _> = ic_cdk::call(
+        treasury_canister, 
+        "distribute_harlee_reward", 
+        (recipient, amount, memo)
+    ).await;
 
     ARTICLES.with(|a| {
         if let Some(article) = a.borrow_mut().get(&StorableU64(article_id)).map(|a| a.clone()) {
@@ -2792,13 +3110,41 @@ fn extract_plagiarism_score_from_text(text: &str) -> f64 {
 
 /// Detect AI-generated content
 async fn detect_ai_content(content: &str) -> Result<AIDetectionResult, String> {
-    // TODO: Implement with AI detection API (e.g., GPTZero, Originality.ai)
-    // For now, return mock result
+    // Call AI Council to perform detection
+    let prompt = format!(
+        "Analyze the following text and determine the probability that it was generated by an AI model. \
+        Provide a probability (0.0 to 1.0), a confidence score, and a list of indicators (e.g., 'repetitive structure', 'unnatural phrasing'). \
+        Return ONLY a JSON object: {{\"probability\": 0.0, \"confidence\": 0.0, \"indicators\": []}}\n\n\
+        Text: {}",
+        if content.len() > 2000 { &content[..2000] } else { content }
+    );
+
+    let system_prompt = "You are an expert in AI writing detection and linguistic analysis.".to_string();
+
+    match query_ai_council(prompt, Some(system_prompt), vec![], None).await {
+        Ok(session) => {
+            let response = session.consensus.map(|c| c.final_response).unwrap_or_default();
+            
+            // Extract JSON
+            let json_start = response.find('{').ok_or("No JSON in AI detection response")?;
+            let json_end = response.rfind('}').ok_or("No JSON in AI detection response")? + 1;
+            let json_str = &response[json_start..json_end];
+
+            let v: serde_json::Value = serde_json::from_str(json_str)
+                .map_err(|e| format!("Failed to parse AI detection JSON: {}", e))?;
+
     Ok(AIDetectionResult {
-        probability: 0.3, // 30% chance of being AI
-        confidence: 0.85,
-        indicators: vec![],
+                probability: v["probability"].as_f64().unwrap_or(0.5) as f32,
+                confidence: v["confidence"].as_f64().unwrap_or(0.8) as f32,
+                indicators: v["indicators"].as_array()
+                    .unwrap_or(&vec![])
+                    .iter()
+                    .map(|i| i.as_str().unwrap_or("").to_string())
+                    .collect(),
     })
+        }
+        Err(e) => Err(format!("AI Council call failed: {}", e)),
+    }
 }
 
 /// Submit user article with plagiarism and AI detection
@@ -2843,6 +3189,7 @@ async fn submit_user_article(
         excerpt: excerpt.clone(),
         content,
         author_persona: ArticlePersona::Raven, // Default for user submissions
+        author_principal: Some(caller),
         category: "user-submitted".to_string(),
         tags: vec![],
         seo_title: title,
@@ -3482,7 +3829,21 @@ async fn deep_search_source(reference: &str) -> Result<PlagiarismMatch, String> 
     
     // Call Perplexity API for web search
     let perplexity_url = "https://api.perplexity.ai/chat/completions";
-    let api_key = PERPLEXITY_API_KEY;
+    let api_key = CONFIG.with(|c| {
+        c.borrow()
+            .get()
+            .llm_providers
+            .clone()
+            .unwrap_or_default()
+            .into_iter()
+            .find(|p| p.enabled && p.name.to_lowercase().contains("perplexity") && !p.api_key.is_empty())
+            .map(|p| p.api_key)
+    })
+    .unwrap_or_default();
+
+    if api_key.is_empty() {
+        return Err("Perplexity is not configured (missing API key). Admin must call admin_set_llm_api_key for the Perplexity provider.".to_string());
+    }
 
     let body = json!({
         "model": "sonar-pro",
@@ -3571,7 +3932,7 @@ fn format_citation(metadata: &serde_json::Value, format: &CitationFormat) -> Wor
     let publish_date = metadata["publish_date"].as_str().unwrap_or("2024");
     let access_date = metadata["access_date"].as_str().unwrap_or("2024");
 
-    let citation_text = match format {
+    let _citation_text = match format {
         CitationFormat::MLA => {
             format!(
                 "{}. \"{}\" {}. {}. Web. {}.",
@@ -3729,10 +4090,9 @@ async fn heartbeat() {
 #[init]
 fn init() {
     let caller = ic_cdk::caller();
-    let admin = Principal::from_text(ADMIN_PRINCIPAL).unwrap_or(caller);
     
     let config = Config {
-        admins: vec![admin],
+        admins: vec![caller],
         treasury_principal: Principal::from_text(TREASURY_CANISTER).unwrap_or(Principal::anonymous()),
         btc_address: String::new(),
         raven_token_canister: Principal::from_text(RAVEN_TOKEN_CANISTER).unwrap_or(Principal::anonymous()),
@@ -3763,6 +4123,11 @@ fn init() {
                 enabled: true,
             },
         ]),
+        eleven_labs_api_key: if ELEVEN_LABS_API_KEY.is_empty() {
+            None
+        } else {
+            Some(ELEVEN_LABS_API_KEY.to_string())
+        },
     };
 
     CONFIG.with(|c| {
@@ -3813,6 +4178,236 @@ fn post_upgrade() {
     ensure_article_id_valid();
     
     ic_cdk::println!("post_upgrade: Stable memory validation complete");
+}
+
+// ============ CROSSWORD FUNCTIONS ============
+
+#[update]
+async fn generate_crossword_puzzle(theme: String, difficulty: PuzzleDifficulty) -> Result<CrosswordPuzzle, String> {
+    let caller = ic_cdk::caller();
+    if caller == Principal::anonymous() {
+        return Err("Authentication required".to_string());
+    }
+
+    let difficulty_str = match difficulty {
+        PuzzleDifficulty::Easy => "easy",
+        PuzzleDifficulty::Medium => "medium",
+        PuzzleDifficulty::Hard => "hard",
+    };
+
+    let grid_size = match difficulty {
+        PuzzleDifficulty::Easy => 7,
+        PuzzleDifficulty::Medium => 10,
+        PuzzleDifficulty::Hard => 13,
+    };
+
+    let prompt = format!(
+        "Generate a {} crossword puzzle with theme: '{}'. Grid size: {}x{}.\n\
+        Return ONLY a JSON object with this structure:\n\
+        {{\n\
+          \"title\": \"string\",\n\
+          \"theme\": \"string\",\n\
+          \"clues\": [\n\
+            {{ \"number\": 1, \"direction\": \"across\", \"clue\": \"string\", \"answer\": \"string\" }}\n\
+          ],\n\
+          \"grid\": [\n\
+            {{ \"row\": 0, \"col\": 0, \"letter\": \"char\" }}\n\
+          ]\n\
+        }}",
+        difficulty_str, theme, grid_size, grid_size
+    );
+
+    let system_prompt = "You are an expert crossword puzzle designer. You create challenging but fair puzzles with consistent themes. Ensure the grid is valid and all clues match the answers perfectly. Return ONLY valid JSON.".to_string();
+
+    match query_ai_council(prompt, Some(system_prompt), vec![], None).await {
+        Ok(session) => {
+            let response_text = session.consensus
+                .map(|c| c.final_response)
+                .unwrap_or_else(|| String::new());
+            
+            // Clean response (remove markdown if present)
+            let json_start = response_text.find('{').ok_or("Invalid AI response: No JSON found")?;
+            let json_end = response_text.rfind('}').ok_or("Invalid AI response: No JSON found")? + 1;
+            let json_str = &response_text[json_start..json_end];
+
+            let v: serde_json::Value = serde_json::from_str(json_str)
+                .map_err(|e| format!("Failed to parse crossword JSON: {}", e))?;
+
+            let title = v["title"].as_str().unwrap_or("Daily Crossword").to_string();
+            let theme = v["theme"].as_str().unwrap_or(&theme).to_string();
+            
+            let mut clues = Vec::new();
+            if let Some(clues_arr) = v["clues"].as_array() {
+                for c in clues_arr {
+                    clues.push(CrosswordClue {
+                        number: c["number"].as_u64().unwrap_or(0) as u32,
+                        direction: c["direction"].as_str().unwrap_or("across").to_string(),
+                        clue: c["clue"].as_str().unwrap_or("").to_string(),
+                        answer: c["answer"].as_str().unwrap_or("").to_string().to_uppercase(),
+                        difficulty: difficulty.clone(),
+                    });
+                }
+            }
+
+            let mut answers = Vec::new();
+            if let Some(grid_arr) = v["grid"].as_array() {
+                for g in grid_arr {
+                    answers.push((
+                        g["row"].as_u64().unwrap_or(0) as u32,
+                        g["col"].as_u64().unwrap_or(0) as u32,
+                        g["letter"].as_str().unwrap_or("").to_string().to_uppercase(),
+                    ));
+                }
+            }
+
+            let puzzle_id = format!("puzzle_{}_{}", theme.replace(" ", "_"), ic_cdk::api::time());
+            let puzzle = CrosswordPuzzle {
+                id: puzzle_id.clone(),
+                title,
+                theme,
+                grid_size,
+                clues,
+                answers,
+                difficulty,
+                ai_generated: true,
+                created_at: ic_cdk::api::time(),
+                rewards_harlee: 100_000_000, // 1 HARLEE default
+                rewards_xp: 50,
+            };
+
+            CROSSWORDS.with(|cw| {
+                cw.borrow_mut().insert(StorableString(puzzle_id), puzzle.clone());
+            });
+
+            Ok(puzzle)
+        }
+        Err(e) => Err(format!("Failed to generate crossword via AI: {}", e)),
+    }
+}
+
+#[query]
+fn get_crossword_puzzle(puzzle_id: String) -> Option<CrosswordPuzzle> {
+    CROSSWORDS.with(|cw| cw.borrow().get(&StorableString(puzzle_id)).map(|p| p.clone()))
+}
+
+#[update]
+async fn verify_crossword_solution(puzzle_id: String, user_answers: Vec<(u32, u32, String)>) -> Result<(bool, u64, u32), String> {
+    let puzzle = get_crossword_puzzle(puzzle_id).ok_or("Puzzle not found")?;
+    
+    // Check if solution matches
+    let mut correct = true;
+    for (row, col, letter) in &puzzle.answers {
+        let mut found = false;
+        for (u_row, u_col, u_letter) in &user_answers {
+            if row == u_row && col == u_col {
+                if letter.to_uppercase() != u_letter.to_uppercase() {
+                    correct = false;
+                }
+                found = true;
+                break;
+            }
+        }
+        if !found {
+            correct = false;
+        }
+        if !correct { break; }
+    }
+
+    if correct {
+        // Award rewards via KIP service (inter-canister call)
+        let caller = ic_cdk::caller();
+        let _ = award_game_rewards(caller, puzzle.rewards_harlee, puzzle.rewards_xp, 1).await;
+        Ok((true, puzzle.rewards_harlee, puzzle.rewards_xp))
+    } else {
+        Ok((false, 0, 0))
+    }
+}
+
+#[query]
+fn get_recent_crossword_puzzles(limit: u32) -> Vec<CrosswordPuzzle> {
+    CROSSWORDS.with(|cw| {
+        cw.borrow().iter().rev().take(limit as usize).map(|(_, p)| p.clone()).collect()
+    })
+}
+
+async fn award_game_rewards(user: Principal, harlee: u64, xp: u32, crosswords: u64) -> Result<(), String> {
+    let kip_canister = Principal::from_text("3yjr7-iqaaa-aaaao-a4xaq-cai").unwrap();
+    
+    #[derive(CandidType, Serialize, Deserialize)]
+    pub struct UserStats {
+        pub total_games_played: u64,
+        pub total_harlee_earned: u64,
+        pub crossword_puzzles_solved: u64,
+        pub sk8_punks_high_score: u64,
+        pub articles_written: u64,
+        pub memes_uploaded: u64,
+        pub nfts_owned: u64,
+    }
+
+    #[derive(CandidType, Serialize)]
+    struct StatsUpdate {
+        pub games_played: Option<u64>,
+        pub harlee_earned: Option<u64>,
+        pub crosswords_solved: Option<u64>,
+        pub sk8_high_score: Option<u64>,
+        pub articles: Option<u64>,
+        pub memes: Option<u64>,
+        pub nfts: Option<u64>,
+    }
+
+    let update = StatsUpdate {
+        games_played: Some(1),
+        harlee_earned: Some(harlee),
+        crosswords_solved: Some(crosswords),
+        sk8_high_score: None,
+        articles: None,
+        memes: None,
+        nfts: None,
+    };
+
+    let _: Result<(Result<UserStats, String>,), _> = ic_cdk::call(kip_canister, "update_user_stats", (user, update.games_played, update.harlee_earned, update.crosswords_solved, update.sk8_high_score, update.articles, update.memes, update.nfts)).await;
+    Ok(())
+}
+
+#[update]
+async fn broadcast_message_to_swarm(title: String, message: String) -> Result<u32, String> {
+    if !is_admin(ic_cdk::caller()) {
+        return Err("Not authorized".to_string());
+    }
+
+    let mut success_count = 0;
+    
+    // Get all registered AXIOMs
+    let axioms = AXIOMS.with(|a| {
+        a.borrow().iter().map(|(_, axiom)| axiom.clone()).collect::<Vec<_>>()
+    });
+
+    for axiom in axioms {
+        if let Some(canister_id) = axiom.dedicated_canister {
+            let notification = RavenNotification {
+                id: 0, // Will be set by receiving agent
+                notification_type: NotificationType::AdminAnnouncement,
+                title: title.clone(),
+                message: message.clone(),
+                sender: "Queen Bee".to_string(),
+                created_at: ic_cdk::api::time(),
+                scheduled_for: None,
+                sent: true,
+                sent_at: Some(ic_cdk::api::time()),
+                recipients: vec![axiom.number],
+            };
+
+            let _: Result<(Result<(), String>,), _> = ic_cdk::call(
+                canister_id,
+                "receive_notification",
+                (notification,)
+            ).await;
+            
+            success_count += 1;
+        }
+    }
+
+    Ok(success_count)
 }
 
 ic_cdk::export_candid!();

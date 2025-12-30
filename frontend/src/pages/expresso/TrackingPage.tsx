@@ -12,22 +12,8 @@ import {
 } from 'lucide-react';
 import { EmptyState, ErrorDisplay } from '../../components/shared/DataFetching';
 
-interface ShipmentUpdate {
-  time: string;
-  message: string;
-  location?: string;
-}
-
-interface Shipment {
-  id: string;
-  loadId: string;
-  origin: string;
-  destination: string;
-  status: 'picked_up' | 'in_transit' | 'delivered' | 'delayed';
-  estimatedDelivery: string;
-  driver?: string;
-  updates: ShipmentUpdate[];
-}
+type Shipment = import('../../services/logisticsService').Shipment;
+type ShipmentUpdate = import('../../services/logisticsService').ShipmentUpdate;
 
 export default function TrackingPage() {
   const [trackingId, setTrackingId] = useState('');
@@ -211,15 +197,15 @@ export default function TrackingPage() {
               </div>
             </div>
 
-            {/* Driver Info */}
-            {shipment.driver && (
+            {/* Current Location */}
+            {shipment.currentLocation && (
               <div className="flex items-center gap-3 p-3 bg-logistics-blue/10 rounded-lg">
                 <div className="w-10 h-10 rounded-full bg-logistics-blue/20 flex items-center justify-center">
                   <Truck className="w-5 h-5 text-logistics-blue" />
                 </div>
                 <div>
-                  <p className="text-silver-500 text-xs">Driver</p>
-                  <p className="text-white font-medium">{shipment.driver}</p>
+                  <p className="text-silver-500 text-xs">Current Location</p>
+                  <p className="text-white font-medium">{shipment.currentLocation}</p>
                 </div>
               </div>
             )}
@@ -240,15 +226,15 @@ export default function TrackingPage() {
                   <div className="flex-1 pb-4">
                     <div className="flex items-center gap-2 mb-1">
                       <Clock className="w-4 h-4 text-silver-500" />
-                      <span className="text-silver-500 text-sm">{update.time}</span>
+                      <span className="text-silver-500 text-sm">
+                        {new Date(update.timestamp).toLocaleString()}
+                      </span>
                     </div>
                     <p className="text-white">{update.message}</p>
-                    {update.location && (
-                      <p className="text-silver-400 text-sm flex items-center gap-1 mt-1">
-                        <MapPin className="w-3 h-3" />
-                        {update.location}
-                      </p>
-                    )}
+                    <p className="text-silver-400 text-sm flex items-center gap-1 mt-1">
+                      <MapPin className="w-3 h-3" />
+                      {update.location}
+                    </p>
                   </div>
                 </div>
               ))}

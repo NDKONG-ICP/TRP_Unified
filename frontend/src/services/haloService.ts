@@ -1,11 +1,10 @@
 import { Actor, HttpAgent } from '@dfinity/agent';
 import { idlFactory as ravenAIIdlFactory } from '../declarations/raven_ai';
 import { _SERVICE } from '../declarations/raven_ai/raven_ai.did';
-import { Identity } from '@dfinity/auth-client';
 import { Principal } from '@dfinity/principal';
 import { HALOOptions, CitationFormat } from '../components/halo/HALOUpload';
-
-const CANISTER_ID = process.env.VITE_RAVEN_AI_CANISTER_ID || '3noas-jyaaa-aaaao-a4xda-cai';
+import { getCanisterId, getICHost, isMainnet } from './canisterConfig';
+import type { Identity } from '@dfinity/agent';
 
 class HALOService {
   private actor: Actor | null = null;
@@ -15,12 +14,18 @@ class HALOService {
     this.identity = identity;
     const agent = new HttpAgent({
       identity,
-      host: 'https://icp-api.io',
+      host: getICHost(),
     });
 
+    // Fetch root key for local development
+    if (!isMainnet()) {
+      agent.fetchRootKey().catch(console.error);
+    }
+
+    const canisterId = getCanisterId('raven_ai');
     this.actor = Actor.createActor<_SERVICE>(ravenAIIdlFactory, {
       agent,
-      canisterId: Principal.fromText(CANISTER_ID),
+      canisterId: Principal.fromText(canisterId),
     });
   }
 

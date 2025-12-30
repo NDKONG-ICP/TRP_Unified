@@ -12,7 +12,11 @@ import { isMetaMaskInstalled } from '../../services/wallets/ethereum';
 import { isPhantomInstalled } from '../../services/wallets/solana';
 import { isUnisatInstalled, isXverseInstalled } from '../../services/wallets/bitcoin';
 import { isSuiWalletInstalled } from '../../services/wallets/sui';
-import { signInWithChain, AuthChain } from '../../services/auth';
+import type { AuthChain } from '../../services/auth';
+import { kipService } from '../../services/kipService';
+import { connectPhantom, signMessage as solanaSignMessage } from '../../services/wallets/solana';
+import { connectSuiWallet, signMessage as suiSignMessage } from '../../services/wallets/sui';
+import bs58 from 'bs58';
 
 interface WalletOption {
   id: string;
@@ -113,8 +117,86 @@ interface WalletConnectProps {
 export default function WalletConnect({ isOpen, onClose }: WalletConnectProps) {
   const [connecting, setConnecting] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const { login } = useAuthStore();
+  const { login, isAuthenticated, identity } = useAuthStore();
   const { connect: connectWallet } = useWalletStore();
+
+  const normalizeSignatureToBase58 = (sig: string): string => {
+    if (sig.startsWith('0x')) return sig;
+    try {
+      const bytes = bs58.decode(sig);
+      if (bytes.length === 64) return sig;
+    } catch {
+      // fallthrough
+    }
+    const raw = atob(sig);
+    const bytes = new Uint8Array(raw.length);
+    for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+    return bs58.encode(bytes);
+  };
+
+  const formatSIWSMessageBackend = (msg: any): string => {
+    let formatted = `${msg.domain} wants you to sign in with your Solana account:\n`;
+    formatted += `${msg.address}\n\n`;
+    if (msg.statement && msg.statement.length > 0) {
+      formatted += `${msg.statement[0]}\n\n`;
+    }
+    formatted += `URI: ${msg.uri}\n`;
+    formatted += `Version: ${msg.version}\n`;
+    formatted += `Chain ID: ${msg.chain_id}\n`;
+    formatted += `Nonce: ${msg.nonce}\n`;
+    formatted += `Issued At: ${msg.issued_at}`;
+    return formatted;
+  };
+
+  const formatSISMessageBackend = (msg: any): string => {
+    let formatted = `${msg.domain} wants you to sign in with your Sui account:\n`;
+    formatted += `${msg.address}\n\n`;
+    if (msg.statement && msg.statement.length > 0) {
+      formatted += `${msg.statement[0]}\n\n`;
+    }
+    formatted += `URI: ${msg.uri}\n`;
+    formatted += `Version: ${msg.version}\n`;
+    formatted += `Chain ID: ${msg.chain_id}\n`;
+    formatted += `Nonce: ${msg.nonce}\n`;
+    formatted += `Issued At: ${msg.issued_at}`;
+    return formatted;
+  };
+
+  const linkExternalWallet = async (walletId: string) => {
+    if (!isAuthenticated || !identity) {
+      throw new Error('Connect an ICP wallet first. External wallets are linked to your ICP principal.');
+    }
+    await kipService.init(identity);
+
+    if (walletId === 'phantom') {
+      const challenge = await kipService.startLinkWallet('phantom');
+      const msg0 = challenge.payload?.Solana;
+      if (!msg0) throw new Error('Unexpected challenge payload for Solana');
+      const conn = await connectPhantom();
+      const msg = { ...msg0, address: conn.wallet.address };
+      const formatted = formatSIWSMessageBackend(msg);
+      const sigBytes = await solanaSignMessage(formatted);
+      const signature = bs58.encode(sigBytes);
+      await kipService.confirmLinkWallet({ Solana: msg }, signature);
+      return;
+    }
+
+    if (walletId === 'sui-wallet') {
+      const challenge = await kipService.startLinkWallet('sui');
+      const msg0 = challenge.payload?.Sui;
+      if (!msg0) throw new Error('Unexpected challenge payload for Sui');
+      const conn = await connectSuiWallet();
+      const addrOrPubkey = conn.wallet.publicKey || conn.wallet.address;
+      const msg = { ...msg0, address: addrOrPubkey };
+      const formatted = formatSISMessageBackend(msg);
+      const rawSig = await suiSignMessage(formatted);
+      const signature = normalizeSignatureToBase58(rawSig);
+      await kipService.confirmLinkWallet({ Sui: msg }, signature);
+      return;
+    }
+
+    throw new Error('Linking for this wallet is not implemented yet.');
+  };
 
   const handleConnect = async (walletId: string, chain: AuthChain | 'icp') => {
     setConnecting(walletId);
@@ -148,31 +230,8 @@ export default function WalletConnect({ isOpen, onClose }: WalletConnectProps) {
             setError(`Unknown ICP wallet: ${walletId}`);
         }
       } else {
-        // Handle external chain wallets via Sign-In-With-X
-        const domain = window.location.hostname;
-        const uri = window.location.origin;
-        
-        // Map wallet ID to chain if needed
-        let targetChain = chain;
-        if (walletId === 'metamask') {
-          targetChain = 'ethereum';
-        } else if (walletId === 'phantom') {
-          targetChain = 'solana';
-        } else if (walletId === 'unisat' || walletId === 'xverse') {
-          targetChain = 'bitcoin';
-        } else if (walletId === 'sui-wallet') {
-          targetChain = 'sui';
-        }
-        
-        const result = await signInWithChain(targetChain, domain, uri);
-        
-        // Update auth store with the new principal
-        useAuthStore.setState({
-          identity: null, // External chains don't use ICP identity
-          principal: result.session.principal,
-          isAuthenticated: true,
-        });
-        
+        // External chain wallets are linked to the canonical ICP principal (not used as IC-call identities)
+        await linkExternalWallet(walletId);
         onClose();
       }
     } catch (err: any) {

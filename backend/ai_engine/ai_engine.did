@@ -46,6 +46,9 @@ type AIConfig = record {
     admin: principal;
     cache_duration_ns: nat64;
     max_requests_per_minute: nat32;
+    huggingface_api_key: text;
+    perplexity_api_key: text;
+    openai_api_key: text;
 };
 
 // LLM Council Types
@@ -190,8 +193,8 @@ type AgentMemory = record {
 service : {
     // Route Optimization
     optimize_route: (text, text) -> (variant { Ok: RouteOptimization; Err: text });
-    predict_eta: (text, text, opt text) -> (ETAPrediction) query;
-    optimize_fuel: (text, text, float64) -> (FuelOptimization) query;
+    predict_eta: (text, text, opt text) -> (variant { Ok: ETAPrediction; Err: text });
+    optimize_fuel: (text, text, float64) -> (variant { Ok: FuelOptimization; Err: text });
     
     // Cache Management
     clear_cache: () -> (variant { Ok: nat64; Err: text });
@@ -200,6 +203,7 @@ service : {
     
     // Config
     get_config: () -> (AIConfig) query;
+    admin_set_api_keys: (text, text, text) -> (variant { Ok; Err: text });
     health: () -> (text) query;
     
     // LLM Council API

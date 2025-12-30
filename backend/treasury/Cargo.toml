@@ -12,6 +12,10 @@ ic-cdk-macros = { workspace = true }
 ic-stable-structures = { workspace = true }
 candid = { workspace = true }
 serde = { workspace = true }
+sha2 = "0.10"
+sha3 = "0.10"
+hex = "0.4"
+ripemd = "0.1"
 
 
 

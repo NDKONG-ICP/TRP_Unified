@@ -36,6 +36,35 @@ const VOICE_SETTINGS = {
 // Whether to use backend proxy (recommended for production to avoid CORS)
 const USE_BACKEND_PROXY = SHOULD_USE_PROXY;
 
+async function speakWithElevenLabsDirect(text: string): Promise<void> {
+  if (!isElevenLabsConfigured()) {
+    throw new Error('ElevenLabs not configured');
+  }
+
+  const url = `${ELEVEN_LABS_API_URL}/text-to-speech/${ELEVEN_LABS_VOICE_ID}`;
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'xi-api-key': ELEVEN_LABS_API_KEY,
+    },
+    body: JSON.stringify({
+      text,
+      model_id: 'eleven_multilingual_v2',
+      voice_settings: VOICE_SETTINGS,
+    }),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text().catch(() => '');
+    throw new Error(`ElevenLabs error ${response.status}: ${errText}`);
+  }
+
+  const audioBuffer = await response.arrayBuffer();
+  const bytes = new Uint8Array(audioBuffer);
+  await playAudio(bytes);
+}
+
 export interface VoiceState {
   isListening: boolean;
   isSpeaking: boolean;
@@ -152,6 +181,18 @@ export async function speakText(text: string): Promise<void> {
       }
     } catch (error) {
       console.log('⚠️ Plug voice synthesis failed:', error);
+    }
+  }
+
+  // Try ElevenLabs directly from the browser if keys are configured (VITE_*).
+  // This avoids canister HTTP-outcall consensus issues for non-deterministic audio generation.
+  if (isElevenLabsConfigured()) {
+    try {
+      console.log('🔊 Using Eleven Labs directly from browser (VITE key)...');
+      await speakWithElevenLabsDirect(cleanText);
+      return;
+    } catch (error) {
+      console.log('⚠️ Eleven Labs direct call failed, falling back to browser TTS:', error);
     }
   }
 

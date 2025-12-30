@@ -1,17 +1,19 @@
 #!/bin/bash
 
 # Deploy Frontend Assets to Mainnet
-# Handles dfx color issues
+# Uses the repo-local dfx safe wrapper to avoid ColorOutOfRange / broken-pipe issues
 
 set -e
-
-export NO_COLOR=1
-export TERM=dumb
-unset COLORTERM
 
 cd "$(dirname "$0")/.."
 
 echo "🌐 Deploying frontend assets to mainnet..."
+
+# Sync declarations into the frontend (so new canister methods are available)
+if [ -d "src/declarations" ] && [ -d "frontend/src/declarations" ]; then
+  echo "📋 Syncing canister declarations into frontend..."
+  rsync -a --delete src/declarations/ frontend/src/declarations/
+fi
 
 # Build frontend first
 echo "🔨 Building frontend..."
@@ -21,12 +23,9 @@ cd ..
 
 # Deploy assets canister
 echo "📦 Deploying assets canister..."
-dfx deploy assets --network ic --no-wallet --yes 2>&1 | grep -v "ColorOutOfRange" || {
-    # If deployment fails due to color, try without filtering
-    dfx deploy assets --network ic --no-wallet --yes
-}
+./scripts/dfx_safe.sh deploy assets --network ic --no-wallet --yes
 
-ASSETS_ID=$(dfx canister id assets --network ic 2>/dev/null || echo "")
+ASSETS_ID=$(./scripts/dfx_safe.sh canister id assets --network ic 2>/dev/null || echo "")
 
 if [ -n "$ASSETS_ID" ]; then
     echo ""

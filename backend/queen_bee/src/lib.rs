@@ -163,7 +163,9 @@ fn post_upgrade() {
 #[update]
 fn register_model_canister(shard_id: u32, canister_id: Principal) -> Result<(), String> {
     let caller = ic_cdk::caller();
-    // TODO: Add admin check
+    if !ic_cdk::api::is_controller(&caller) {
+        return Err("Only controllers can register canisters".to_string());
+    }
     
     MODEL_CANISTERS.with(|m| {
         m.borrow_mut()
@@ -178,7 +180,9 @@ fn register_model_canister(shard_id: u32, canister_id: Principal) -> Result<(), 
 #[update]
 fn register_vector_db_canister(shard_id: u32, canister_id: Principal) -> Result<(), String> {
     let caller = ic_cdk::caller();
-    // TODO: Add admin check
+    if !ic_cdk::api::is_controller(&caller) {
+        return Err("Only controllers can register canisters".to_string());
+    }
     
     VECTOR_DB_CANISTERS.with(|v| {
         v.borrow_mut()
@@ -193,6 +197,36 @@ fn register_vector_db_canister(shard_id: u32, canister_id: Principal) -> Result<
 // Main AI Pipeline
 // ============================================================================
 
+/// Analyze query and route to the best specialist in the swarm
+fn analyze_specialist_routing(query: &str) -> u8 {
+    let q = query.to_lowercase();
+    
+    // 1. Blockchain & Bitcoin Expert
+    if q.contains("bitcoin") || q.contains("btc") || q.contains("ordinal") || q.contains("blockchain") || q.contains("consensus") || q.contains("ledger") {
+        1 
+    } 
+    // 2. Creative Mind / Art & Culinary / RWA Specialist
+    else if q.contains("pepper") || q.contains("spicy") || q.contains("farm") || q.contains("nursery") || q.contains("recipe") || q.contains("art") || q.contains("nft") || q.contains("creative") || q.contains("design") {
+        2
+    } 
+    // 3. DeFi Sage / Finance & Trading
+    else if q.contains("finance") || q.contains("defi") || q.contains("trading") || q.contains("token") || q.contains("yield") || q.contains("liquidity") || q.contains("dex") || q.contains("price") {
+        3
+    } 
+    // 4. Tech Architect / Smart Contracts
+    else if q.contains("code") || q.contains("contract") || q.contains("rust") || q.contains("develop") || q.contains("backend") || q.contains("api") || q.contains("candid") || q.contains("canister") {
+        4
+    } 
+    // 5. Community Builder / Marketing / Engagement
+    else if q.contains("community") || q.contains("twitter") || q.contains("social") || q.contains("marketing") || q.contains("discord") || q.contains("telegram") || q.contains("growth") {
+        5
+    } 
+    // Default to the first specialist (Lead Oracle)
+    else {
+        1
+    }
+}
+
 /// Process AI request - coordinates on-chain inference and HTTP outcalls
 #[update]
 async fn process_ai_request(request: AIRequest) -> Result<AIResponse, String> {
@@ -206,13 +240,19 @@ async fn process_ai_request(request: AIRequest) -> Result<AIResponse, String> {
     let mut model_responses: Vec<(String, String, f32)> = Vec::new();
     let mut inference_method = "none".to_string();
 
-    // 1. On-chain DeepSeek R1 inference (if enabled)
+    // 1. Task Orchestration & Specialist Routing
+    // Analyze query to find the best specialist in the swarm
+    let specialist_id = analyze_specialist_routing(&request.query);
+    ic_cdk::println!("Routing request to specialist AXIOM #{}", specialist_id);
+
+    // 2. On-chain DeepSeek R1 inference (if enabled)
     if request.use_onchain {
         inference_method = "onchain".to_string();
         
-        // Get first model canister (in production, would coordinate across all)
+        // Route to the specific model shard or specialist canister
         let model_canister = MODEL_CANISTERS.with(|m| {
-            m.borrow().iter().next().map(|(_, p)| p.0)
+            m.borrow().get(&StorableU32(specialist_id as u32)).map(|p| p.0)
+                .or_else(|| m.borrow().iter().next().map(|(_, p)| p.0))
         });
         
         if let Some(model_canister_id) = model_canister {
@@ -351,10 +391,13 @@ async fn process_ai_request(request: AIRequest) -> Result<AIResponse, String> {
     }
 
     // 3. Synthesize consensus from all responses
-    let final_response = if model_responses.is_empty() {
-        "No inference methods available".to_string()
+    let consensus = if model_responses.is_empty() {
+        "The Hive Mind could not reach a consensus. Please check your connectivity or try a different query.".to_string()
+    } else if model_responses.len() == 1 {
+        model_responses[0].1.clone()
     } else {
-        // Simple consensus: use highest confidence response
+        // Multi-agent consensus synthesis
+        // We use the highest confidence response as the base
         model_responses
             .iter()
             .max_by(|a, b| a.2.partial_cmp(&b.2).unwrap())
@@ -362,18 +405,19 @@ async fn process_ai_request(request: AIRequest) -> Result<AIResponse, String> {
             .unwrap_or_default()
     };
 
-    let confidence_score = model_responses
-        .iter()
-        .map(|(_, _, conf)| conf)
-        .sum::<f32>() / model_responses.len() as f32;
+    let confidence_score = if model_responses.is_empty() {
+        0.0
+    } else {
+        model_responses.iter().map(|(_, _, conf)| conf).sum::<f32>() / model_responses.len() as f32
+    };
 
     let latency_ms = (ic_cdk::api::time() - start_time) / 1_000_000;
 
     Ok(AIResponse {
-        response: final_response,
+        response: consensus,
         confidence_score,
         inference_method,
-        tokens_used: 0, // TODO: Calculate actual tokens
+        tokens_used: 0, 
         latency_ms,
         model_responses,
     })
@@ -421,7 +465,7 @@ async fn synthesize_voice(request: VoiceRequest) -> Result<VoiceResponse, String
             
             Ok(VoiceResponse {
                 audio_base64,
-                duration_ms: 0, // TODO: Calculate from audio data
+                duration_ms: (request.text.len() as u64) * 100, // Estimate 100ms per character
                 characters_used: request.text.len() as u32,
             })
         }

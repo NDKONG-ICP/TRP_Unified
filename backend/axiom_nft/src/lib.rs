@@ -24,6 +24,7 @@ const CONVERSATIONS_MEM_ID: MemoryId = MemoryId::new(1);
 const MEMORY_MEM_ID: MemoryId = MemoryId::new(2);
 const CONFIG_MEM_ID: MemoryId = MemoryId::new(3);
 const NOTIFICATIONS_MEM_ID: MemoryId = MemoryId::new(4);
+const SECRETS_MEM_ID: MemoryId = MemoryId::new(5);
 
 // Main Application Canisters
 const RAVEN_AI_CANISTER: &str = "3noas-jyaaa-aaaao-a4xda-cai"; // Main raven_ai canister (mainnet)
@@ -33,17 +34,15 @@ const TREASURY_CANISTER: &str = "3rk2d-6yaaa-aaaao-a4xba-cai"; // Treasury canis
 // Use Queen Bee for AI processing (set to true to use new architecture)
 const USE_QUEEN_BEE: bool = true; // Set to true after queen_bee deployment
 
-// Admin Controllers - These principals can update the NFT
-const ADMIN_PRINCIPAL_CURSOR: &str = "lgd5r-y4x7q-lbrfa-mabgw-xurgu-4h3at-sw4sl-yyr3k-5kwgt-vlkao-jae";
-const ADMIN_PRINCIPAL_PLUG: &str = "sh7h6-b7xcy-tjank-crj6d-idrcr-ormbi-22yqs-uanyl-itbp3-ur5ue-wae";
-const ADMIN_PRINCIPAL_OISY: &str = "yyirv-5pjkg-oupac-gzja4-ljzfn-6mvon-r5w2i-6e7wm-sde75-wuses-nqe";
-const ADMIN_PRINCIPAL_NEW: &str = "imnyd-k37s2-xlg7c-omeed-ezrzg-6oesa-r3ek6-xrwuz-qbliq-5h675-yae";
+// Admin Controllers - Managed dynamically in state or via controllers
+// Removing hardcoded principals for privacy and security
 
 // LLM API Keys (loaded from init)
-// NOTE: These are placeholders - set via canister initialization in production
-const HUGGINGFACE_API_KEY: &str = env!("HUGGINGFACE_API_KEY");
-const PERPLEXITY_API_KEY: &str = env!("PERPLEXITY_API_KEY");
-const ELEVEN_LABS_API_KEY: &str = env!("ELEVEN_LABS_API_KEY");
+// NOTE: Set via environment variables or canister initialization in production
+// Using const with default empty string - keys should be set via init args or environment
+const HUGGINGFACE_API_KEY: &str = "";
+const PERPLEXITY_API_KEY: &str = "";
+const ELEVEN_LABS_API_KEY: &str = "";
 const ELEVEN_LABS_VOICE_ID: &str = "kPzsL2i3teMYv0FxEYQ6";
 
 // ============ TYPES ============
@@ -72,6 +71,26 @@ pub struct RavenNotification {
     pub sent: bool,
     pub sent_at: Option<u64>,
     pub recipients: Vec<u32>,
+}
+
+#[derive(CandidType, Serialize, Deserialize, Clone, Debug, Default)]
+pub struct SecretConfig {
+    pub huggingface_api_key: String,
+    pub perplexity_api_key: String,
+    pub eleven_labs_api_key: String,
+}
+
+impl Storable for SecretConfig {
+    fn to_bytes(&self) -> Cow<[u8]> {
+        Cow::Owned(Encode!(self).unwrap())
+    }
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        Decode!(bytes.as_ref(), Self).unwrap()
+    }
+    const BOUND: ic_stable_structures::storable::Bound = ic_stable_structures::storable::Bound::Bounded {
+        max_size: 500,
+        is_fixed_size: false,
+    };
 }
 
 impl Storable for RavenNotification {
@@ -228,12 +247,7 @@ impl Default for AxiomConfig {
             max_memory_entries: 1000,
             max_conversation_length: 100,
             temperature: 0.7,
-            controllers: vec![
-                ADMIN_PRINCIPAL_CURSOR.to_string(),
-                ADMIN_PRINCIPAL_PLUG.to_string(),
-                ADMIN_PRINCIPAL_OISY.to_string(),
-                ADMIN_PRINCIPAL_NEW.to_string(),
-            ],
+            controllers: vec![],
         }
     }
 }
@@ -311,6 +325,13 @@ thread_local! {
     
     static CONVERSATIONS: RefCell<StableBTreeMap<StorableU64, Conversation, Memory>> = RefCell::new(
         StableBTreeMap::init(MEMORY_MANAGER.with(|m| m.borrow().get(CONVERSATIONS_MEM_ID)))
+    );
+
+    static SECRETS: RefCell<StableCell<SecretConfig, Memory>> = RefCell::new(
+        StableCell::init(
+            MEMORY_MANAGER.with(|m| m.borrow().get(SECRETS_MEM_ID)),
+            SecretConfig::default()
+        ).unwrap()
     );
     
     static MEMORY_STORE: RefCell<StableBTreeMap<StorableString, MemoryEntry, Memory>> = RefCell::new(
@@ -734,20 +755,16 @@ async fn query_ai_via_queen_bee(
     }
 }
 
-/// Query AI via Queen Bee (new architecture) or raven_ai (legacy)
+/// Query AI via Queen Bee (New Architecture)
+/// Standardizes all AI calls to go through the Hive Mind (Queen Bee)
 async fn query_ai_via_main_canister(query: &str, context: &str, system_prompt: &str) -> Result<String, String> {
-    // Use Queen Bee if enabled and available
-    if USE_QUEEN_BEE && !QUEEN_BEE_CANISTER.is_empty() {
-        if let Ok(queen_bee) = Principal::from_text(QUEEN_BEE_CANISTER) {
-            return query_ai_via_queen_bee(query, context, system_prompt, queen_bee).await;
-        }
-    }
+    // 1. Resolve Queen Bee Principal
+    let queen_bee_id = match Principal::from_text(QUEEN_BEE_CANISTER) {
+        Ok(p) if p != Principal::anonymous() => p,
+        _ => return Err("Queen Bee canister not configured or invalid".to_string()),
+    };
     
-    // Fallback to raven_ai canister using AI Council
-    let raven_ai = Principal::from_text(RAVEN_AI_CANISTER)
-        .map_err(|_| "Invalid raven_ai canister ID")?;
-    
-    // Convert context string to ChatMessage vec
+    // 2. Prepare Context Messages
     let context_messages: Vec<ChatMessage> = if !context.is_empty() {
         context.lines()
             .filter_map(|line| {
@@ -773,42 +790,52 @@ async fn query_ai_via_main_canister(query: &str, context: &str, system_prompt: &
         vec![]
     };
     
-    // Get token_id from metadata for AI Council
-    let token_id = METADATA.with(|m| Some(m.borrow().get().token_id));
+    // 3. Prepare AI Request for Queen Bee
+    // This routes the request through the decentralized swarm logic
+    let token_id = METADATA.with(|m| m.borrow().get().token_id);
     
-    // Call query_ai_council on the main canister
-    let result: Result<(Result<AICouncilSessionResponse, String>,), _> = ic_cdk::call(
-        raven_ai,
-        "query_ai_council",
-        (
-            query.to_string(),
-            Some(system_prompt.to_string()),
-            context_messages,
-            token_id,
-        )
+    #[derive(CandidType, Serialize)]
+    pub struct AIRequest {
+        pub query_text: String,
+        pub system_prompt: Option<String>,
+        pub context: Vec<ChatMessage>,
+        pub token_id: Option<u64>,
+        pub use_onchain: bool,
+        pub use_http_parallel: bool,
+    }
+
+    let request = AIRequest {
+        query_text: query.to_string(),
+        system_prompt: Some(system_prompt.to_string()),
+        context: context_messages,
+        token_id: Some(token_id),
+        use_onchain: true, // Prefer hybrid execution
+        use_http_parallel: true,
+    };
+
+    // 4. Execute Inter-Canister Call to Queen Bee
+    // This is the "Swarm Flow" - delegating work to the Hive Mind
+    let result: Result<(Result<AIResponse, String>,), _> = ic_cdk::call(
+        queen_bee_id,
+        "process_ai_request",
+        (request,)
     ).await;
     
     match result {
-        Ok((Ok(session),)) => {
-            // Extract final response from consensus
-            if let Some(consensus) = session.consensus {
-                Ok(consensus.final_response)
-            } else if !session.responses.is_empty() {
-                // Use first response if no consensus yet
-                Ok(session.responses[0].response.clone())
-            } else {
-                direct_llm_query(query, context, system_prompt).await
-            }
-        }
-        Ok((Err(e),)) => {
-            // Fallback to direct HTTP outcall
-            direct_llm_query(query, context, system_prompt).await
-        }
-        Err((code, msg)) => {
-            // Fallback to direct HTTP outcall
-            direct_llm_query(query, context, system_prompt).await
-        }
+        Ok((Ok(response),)) => Ok(response.response),
+        Ok((Err(e),)) => Err(format!("Queen Bee logic error: {}", e)),
+        Err((code, msg)) => Err(format!("Queen Bee communication failure ({:?}): {}", code, msg)),
     }
+}
+
+#[derive(CandidType, Deserialize)]
+pub struct AIResponse {
+    pub response: String,
+    pub confidence_score: f32,
+    pub inference_method: String,
+    pub tokens_used: u32,
+    pub latency_ms: u64,
+    pub model_responses: Vec<(String, String, f32)>,
 }
 
 #[derive(CandidType, Deserialize)]
@@ -871,6 +898,11 @@ async fn direct_llm_query(query: &str, context: &str, system_prompt: &str) -> Re
         full_prompt.replace('"', "\\\"").replace('\n', "\\n")
     );
     
+    let api_key = SECRETS.with(|s| {
+        let key = s.borrow().get().huggingface_api_key.clone();
+        if key.is_empty() { HUGGINGFACE_API_KEY.to_string() } else { key }
+    });
+    
     let request = CanisterHttpRequestArgument {
         url: "https://api-inference.huggingface.co/models/meta-llama/Llama-3.3-70B-Instruct".to_string(),
         method: HttpMethod::POST,
@@ -879,7 +911,7 @@ async fn direct_llm_query(query: &str, context: &str, system_prompt: &str) -> Re
         transform: None,
         headers: vec![
             HttpHeader { name: "Content-Type".to_string(), value: "application/json".to_string() },
-            HttpHeader { name: "Authorization".to_string(), value: format!("Bearer {}", HUGGINGFACE_API_KEY) },
+            HttpHeader { name: "Authorization".to_string(), value: format!("Bearer {}", api_key) },
         ],
     };
     
@@ -986,6 +1018,11 @@ async fn synthesize_voice(text: &str) -> Result<Vec<u8>, String> {
         ELEVEN_LABS_VOICE_ID
     );
     
+    let api_key = SECRETS.with(|s| {
+        let key = s.borrow().get().eleven_labs_api_key.clone();
+        if key.is_empty() { ELEVEN_LABS_API_KEY.to_string() } else { key }
+    });
+    
     let request = CanisterHttpRequestArgument {
         url,
         method: HttpMethod::POST,
@@ -994,7 +1031,7 @@ async fn synthesize_voice(text: &str) -> Result<Vec<u8>, String> {
         transform: None,
         headers: vec![
             HttpHeader { name: "Content-Type".to_string(), value: "application/json".to_string() },
-            HttpHeader { name: "xi-api-key".to_string(), value: ELEVEN_LABS_API_KEY.to_string() },
+            HttpHeader { name: "xi-api-key".to_string(), value: api_key },
             HttpHeader { name: "Accept".to_string(), value: "audio/mpeg".to_string() },
         ],
     };
@@ -3304,6 +3341,23 @@ fn serve_favicon() -> HttpResponse {
     }
 }
 
+#[update]
+fn admin_set_llm_api_key(provider_name: String, api_key: String) -> Result<(), String> {
+    require_owner_or_controller(ic_cdk::caller())?;
+    
+    SECRETS.with(|s| {
+        let mut secrets = s.borrow().get().clone();
+        match provider_name.to_lowercase().as_str() {
+            "huggingface" => secrets.huggingface_api_key = api_key,
+            "perplexity" => secrets.perplexity_api_key = api_key,
+            "elevenlabs" | "eleven_labs" => secrets.eleven_labs_api_key = api_key,
+            _ => return Err("Unsupported provider".to_string()),
+        }
+        s.borrow_mut().set(secrets).unwrap();
+        Ok(())
+    })
+}
+
 #[query]
 fn health() -> String {
     "OK".to_string()
@@ -3318,12 +3372,7 @@ fn receive_notification(notification: RavenNotification) -> Result<(), String> {
     
     // Verify caller is the Raven AI canister or an admin
     let is_raven_canister = caller.to_text().starts_with("3noas"); // raven_ai canister prefix
-    let is_admin = [
-        ADMIN_PRINCIPAL_CURSOR,
-        ADMIN_PRINCIPAL_PLUG,
-        ADMIN_PRINCIPAL_OISY,
-        ADMIN_PRINCIPAL_NEW,
-    ].iter().any(|p| Principal::from_text(p).map(|pr| pr == caller).unwrap_or(false));
+    let is_admin = is_admin_principal(caller);
     
     if !is_raven_canister && !is_admin {
         return Err("Not authorized to send notifications".to_string());
@@ -3474,12 +3523,15 @@ async fn send_message_to_axiom(to_axiom: u32, message: String) -> Result<(), Str
 }
 
 fn is_admin_principal(caller: Principal) -> bool {
-    [
-        ADMIN_PRINCIPAL_CURSOR,
-        ADMIN_PRINCIPAL_PLUG,
-        ADMIN_PRINCIPAL_OISY,
-        ADMIN_PRINCIPAL_NEW,
-    ].iter().any(|p| Principal::from_text(p).map(|pr| pr == caller).unwrap_or(false))
+    // Check if caller is a controller of this canister
+    if ic_cdk::api::is_controller(&caller) {
+        return true;
+    }
+    
+    // Check if caller is in the admins list in state
+    ADMINS.with(|a| {
+        a.borrow().contains_key(&StorablePrincipal(caller))
+    })
 }
 
 // Generate Candid

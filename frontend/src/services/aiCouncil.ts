@@ -73,6 +73,7 @@ export interface VoteSummary {
 // ============================================================================
 
 import { API_KEYS, isConfigured } from '../config/secureConfig';
+import { isMainnet } from './canisterConfig';
 
 const DEFAULT_CONFIG: AICouncilConfig = {
   apiKey: API_KEYS.HUGGING_FACE,
@@ -92,7 +93,7 @@ const COUNCIL_MODELS: ModelConfig[] = [
     name: 'Perplexity-Sonar',
     repoId: 'perplexity/sonar-pro', // Special marker for Perplexity
     weight: 1.2, // Higher weight - Perplexity has real-time search
-    enabled: true,
+    enabled: !!PERPLEXITY_API_KEY,
   },
   {
     name: 'Qwen2.5-72B',
@@ -383,6 +384,12 @@ export class AICouncil {
    * Query all models in parallel
    */
   async queryCouncil(query: string, context?: string): Promise<CouncilResult> {
+    // On mainnet, browser-side HuggingFace calls fail due to CORS
+    // AI must be accessed via backend canister (raven_ai.query_ai_council)
+    if (isMainnet()) {
+      throw new Error('AI requires login (backend) on mainnet. Please connect your wallet to use RavenAI.');
+    }
+    
     const startTime = Date.now();
     const enabledModels = this.models.filter(m => m.enabled);
     
@@ -686,8 +693,14 @@ There are 5 Genesis AXIOM NFTs (#1-5) with legendary rarity, and 295 more availa
         patterns: [/what is (harlee|\$harlee|harlee token)/i, /tell me about harlee/i],
         response: `$HARLEE is the utility token powering the Raven Ecosystem:
 
-💰 **Staking Rewards** - Earn 100 $HARLEE/week per staked NFT
-🎮 **Game Rewards** - Win $HARLEE in Sk8 Punks and Crossword Quest
+**Token Details:**
+- Total Supply: 100,000,000 $HARLEE
+- Decimals: 8
+- Standard: ICRC-1
+- Ledger: tlm4l-kaaaa-aaaah-qqeha-cai
+
+💰 **Staking Rewards** - Earn 100 $HARLEE/week per staked NFT (with rarity multipliers: Rare 1.5x, Epic 2x, Legendary 3x)
+🎮 **Game Rewards** - Win $HARLEE in Sk8 Punks and Crossword Quest (1 $HARLEE per puzzle)
 📰 **Content Rewards** - Earn for quality articles and memes
 🛒 **Payments** - Use for NFT purchases and subscriptions
 🏦 **Governance** - Participate in ecosystem decisions
@@ -711,7 +724,7 @@ Once connected, you can:
 - Access AI features`,
       },
       {
-        patterns: [/how (do i|can i|to) (stake|staking)/i, /staking rewards/i],
+        patterns: [/how (do i|can i|to) (stake|staking)/i, /staking rewards/i, /staking calculator/i],
         response: `NFT Staking for $HARLEE rewards:
 
 **How to Stake:**
@@ -720,10 +733,20 @@ Once connected, you can:
 3. Select NFTs to stake
 4. Confirm the transaction
 
-**Rewards:**
+**Base Rewards:**
 - 100 $HARLEE per week per staked NFT
 - Rewards accumulate continuously
 - Claim anytime or let them build up
+
+**Rarity Multipliers:**
+- Common: 1x (100/week)
+- Rare: 1.5x (150/week)
+- Epic: 2x (200/week)
+- Legendary: 3x (300/week)
+
+**Yearly Earnings (per NFT):**
+- Common: 5,200 $HARLEE
+- Legendary: 15,600 $HARLEE
 
 **Supported Collections:**
 - Raven's Sk8 Punks (b4mk6-5qaaa-aaaah-arerq-cai)`,

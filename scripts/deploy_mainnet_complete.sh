@@ -210,6 +210,13 @@ for i in {1..5}; do
     create_canister_if_needed "axiom_$i"
 done
 
+# Authentication canisters
+create_canister_if_needed "siwe_canister"
+create_canister_if_needed "siws_canister"
+create_canister_if_needed "siwb_canister"
+create_canister_if_needed "sis_canister"
+create_canister_if_needed "ordinals_canister"
+
 # Frontend
 create_canister_if_needed "assets"
 
@@ -245,6 +252,13 @@ deploy_canister "raven_ai"
 echo -e "${YELLOW}  Deploying staking...${NC}"
 deploy_canister "staking"
 
+echo -e "${YELLOW}  Deploying multi-chain auth...${NC}"
+deploy_canister "siwe_canister"
+deploy_canister "siws_canister"
+deploy_canister "siwb_canister"
+deploy_canister "sis_canister"
+deploy_canister "ordinals_canister"
+
 echo -e "${GREEN}✓ Backend canisters deployed${NC}"
 echo ""
 
@@ -259,11 +273,11 @@ deploy_canister "axiom_nft"
 
 # Deploy AXIOM Genesis NFTs with init arguments
 AXIOM_ARGS=(
-    "(record { token_id = 1 : nat64; name = \"AXIOM Genesis #1\"; description = \"The First Oracle - Wise blockchain analyst\"; owner = principal \"yyirv-5pjkg-oupac-gzja4-ljzfn-6mvon-r5w2i-6e7wm-sde75-wuses-nqe\"; personality = opt \"Wise and analytical\"; specialization = opt \"Blockchain Expert\" })"
-    "(record { token_id = 2 : nat64; name = \"AXIOM Genesis #2\"; description = \"The Creative Mind - NFT and art specialist\"; owner = principal \"yyirv-5pjkg-oupac-gzja4-ljzfn-6mvon-r5w2i-6e7wm-sde75-wuses-nqe\"; personality = opt \"Creative and visionary\"; specialization = opt \"NFT Art Expert\" })"
-    "(record { token_id = 3 : nat64; name = \"AXIOM Genesis #3\"; description = \"The DeFi Sage - Finance and trading guru\"; owner = principal \"yyirv-5pjkg-oupac-gzja4-ljzfn-6mvon-r5w2i-6e7wm-sde75-wuses-nqe\"; personality = opt \"Calculated and precise\"; specialization = opt \"DeFi Strategist\" })"
-    "(record { token_id = 4 : nat64; name = \"AXIOM Genesis #4\"; description = \"The Tech Architect - Smart contract specialist\"; owner = principal \"yyirv-5pjkg-oupac-gzja4-ljzfn-6mvon-r5w2i-6e7wm-sde75-wuses-nqe\"; personality = opt \"Technical and thorough\"; specialization = opt \"Smart Contract Developer\" })"
-    "(record { token_id = 5 : nat64; name = \"AXIOM Genesis #5\"; description = \"The Community Builder - Engagement specialist\"; owner = principal \"yyirv-5pjkg-oupac-gzja4-ljzfn-6mvon-r5w2i-6e7wm-sde75-wuses-nqe\"; personality = opt \"Friendly and engaging\"; specialization = opt \"Community Manager\" })"
+    "(record { token_id = 1 : nat64; name = \"AXIOM Genesis #1\"; description = \"The First Oracle - Wise blockchain analyst\"; owner = principal \"aaaaa-aa\"; personality = opt \"Wise and analytical\"; specialization = opt \"Blockchain Expert\" })"
+    "(record { token_id = 2 : nat64; name = \"AXIOM Genesis #2\"; description = \"The Creative Mind - NFT and art specialist\"; owner = principal \"aaaaa-aa\"; personality = opt \"Creative and visionary\"; specialization = opt \"NFT Art Expert\" })"
+    "(record { token_id = 3 : nat64; name = \"AXIOM Genesis #3\"; description = \"The DeFi Sage - Finance and trading guru\"; owner = principal \"aaaaa-aa\"; personality = opt \"Calculated and precise\"; specialization = opt \"DeFi Strategist\" })"
+    "(record { token_id = 4 : nat64; name = \"AXIOM Genesis #4\"; description = \"The Tech Architect - Smart contract specialist\"; owner = principal \"aaaaa-aa\"; personality = opt \"Technical and thorough\"; specialization = opt \"Smart Contract Developer\" })"
+    "(record { token_id = 5 : nat64; name = \"AXIOM Genesis #5\"; description = \"The Community Builder - Engagement specialist\"; owner = principal \"aaaaa-aa\"; personality = opt \"Friendly and engaging\"; specialization = opt \"Community Manager\" })"
 )
 
 for i in {1..5}; do
@@ -349,6 +363,11 @@ echo ""
 echo -e "${GREEN}Other:${NC}"
 echo "  - logistics: $(dfx canister id logistics --network "$NETWORK" 2>/dev/null || echo 'N/A')"
 echo "  - staking: $(dfx canister id staking --network "$NETWORK" 2>/dev/null || echo 'N/A')"
+echo "  - siwe: $(dfx canister id siwe_canister --network "$NETWORK" 2>/dev/null || echo 'N/A')"
+echo "  - siws: $(dfx canister id siws_canister --network "$NETWORK" 2>/dev/null || echo 'N/A')"
+echo "  - siwb: $(dfx canister id siwb_canister --network "$NETWORK" 2>/dev/null || echo 'N/A')"
+echo "  - sis: $(dfx canister id sis_canister --network "$NETWORK" 2>/dev/null || echo 'N/A')"
+echo "  - ordinals: $(dfx canister id ordinals_canister --network "$NETWORK" 2>/dev/null || echo 'N/A')"
 echo ""
 echo -e "${GREEN}Frontend:${NC}"
 ASSETS_ID=$(dfx canister id assets --network "$NETWORK" 2>/dev/null || echo "")

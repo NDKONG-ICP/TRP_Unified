@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Search, Filter, Grid, List, Sparkles, ExternalLink, Loader2 } from 'lucide-react';
 import { createNFTActor } from '../../services/actorFactory';
 import { CANISTER_IDS } from '../../services/canisterConfig';
-import type { NFTMetadata, Rarity } from '../../declarations/nft';
+import type { NFTMetadata, Rarity } from '../../declarations/nft/nft.did';
 
 interface NFT {
   id: string;

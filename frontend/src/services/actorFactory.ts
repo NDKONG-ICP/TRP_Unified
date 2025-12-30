@@ -9,14 +9,23 @@ import { CANISTER_IDS, getICHost, isMainnet } from './canisterConfig';
 import { isPlugAvailable, createPlugActor, getPlugSession } from './plugService';
 
 // Import IDL factories
-import { idlFactory as coreIdl, _SERVICE as CoreService } from '../declarations/core';
-import { idlFactory as nftIdl, _SERVICE as NFTService } from '../declarations/nft';
-import { idlFactory as ravenAiIdl, _SERVICE as RavenAIService } from '../declarations/raven_ai';
-import { idlFactory as kipIdl, _SERVICE as KIPService } from '../declarations/kip';
-import { idlFactory as treasuryIdl, _SERVICE as TreasuryService } from '../declarations/treasury';
-import { idlFactory as escrowIdl, _SERVICE as EscrowService } from '../declarations/escrow';
-import { idlFactory as logisticsIdl, _SERVICE as LogisticsService } from '../declarations/logistics';
-import { idlFactory as aiEngineIdl, _SERVICE as AIEngineService } from '../declarations/ai_engine';
+import { idlFactory as coreIdl } from '../declarations/core';
+import { idlFactory as nftIdl } from '../declarations/nft';
+import { idlFactory as ravenAiIdl } from '../declarations/raven_ai';
+import { idlFactory as kipIdl } from '../declarations/kip';
+import { idlFactory as treasuryIdl } from '../declarations/treasury';
+import { idlFactory as escrowIdl } from '../declarations/escrow';
+import { idlFactory as logisticsIdl } from '../declarations/logistics';
+import { idlFactory as aiEngineIdl } from '../declarations/ai_engine';
+
+import type { _SERVICE as CoreService } from '../declarations/core/core.did';
+import type { _SERVICE as NFTService } from '../declarations/nft/nft.did';
+import type { _SERVICE as RavenAIService } from '../declarations/raven_ai/raven_ai.did';
+import type { _SERVICE as KIPService } from '../declarations/kip/kip.did';
+import type { _SERVICE as TreasuryService } from '../declarations/treasury/treasury.did';
+import type { _SERVICE as EscrowService } from '../declarations/escrow/escrow.did';
+import type { _SERVICE as LogisticsService } from '../declarations/logistics/logistics.did';
+import type { _SERVICE as AIEngineService } from '../declarations/ai_engine/ai_engine.did';
 
 let cachedAgent: HttpAgent | null = null;
 

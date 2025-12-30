@@ -9,6 +9,7 @@ import { getCanisterId, getICHost, isMainnet } from '../canisterConfig';
 import { connectPhantom, signMessage, getPhantomConnection, SolanaConnection } from '../wallets/solana';
 import { PublicKey } from '@solana/web3.js';
 import { createAuthActor } from './actorHelper';
+import bs58 from 'bs58';
 
 export interface SIWSMessage {
   domain: string;
@@ -33,8 +34,16 @@ export interface SIWSSession {
   expiresAt: bigint;
 }
 
+interface BackendSIWSSession {
+  session_id: string;
+  solana_address: string;
+  principal: Principal;
+  created_at: bigint;
+  expires_at: bigint;
+}
+
 export interface SIWSVerifyResult {
-  Ok?: SIWSSession;
+  Ok?: BackendSIWSSession;
   Err?: string;
 }
 
@@ -183,8 +192,8 @@ export async function signInWithSolana(
   // Sign message with Phantom
   const signatureBytes = await signMessage(formattedMessage);
   
-  // Convert signature to base58 string
-  const signature = Buffer.from(signatureBytes).toString('base64');
+  // Convert signature to base58 string (backend expects base58 or 0x hex)
+  const signature = bs58.encode(signatureBytes);
   
   // Verify with backend canister (uses actorFactory for Plug wallet support)
   const actor = await createAuthActor('siws_canister', siwsIdlFactory);

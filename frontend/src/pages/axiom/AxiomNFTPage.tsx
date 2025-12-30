@@ -734,3 +734,5 @@ export const AxiomNFTPage: React.FC = () => {
     </div>
   );
 };
+
+export default AxiomNFTPage;

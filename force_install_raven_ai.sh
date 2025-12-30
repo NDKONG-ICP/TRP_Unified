@@ -5,10 +5,9 @@ set -e
 
 cd "/Users/williambeck/The Forge NFT Minter/raven-unified-ecosystem"
 
+source "./scripts/dfx_safe_env.sh"
+# Keep the original intent of this script: minimal output / no backtraces
 export RUST_BACKTRACE=0
-export NO_COLOR=1
-export TERM=dumb
-unset COLORTERM
 
 echo "🚀 FORCE INSTALLING raven_ai"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
@@ -19,7 +18,7 @@ CANISTER_ID="3noas-jyaaa-aaaao-a4xda-cai"
 
 if [ ! -f "$WASM_FILE" ]; then
     echo "❌ WASM file not found. Building..."
-    dfx build --network ic raven_ai 2>&1 | grep -v "ColorOutOfRange\|panic\|backtrace" || true
+    ./scripts/dfx_safe.sh build --network ic raven_ai 2>&1 | grep -v "ColorOutOfRange\|panic\|backtrace" || true
 fi
 
 echo "✅ WASM file: $WASM_FILE"
@@ -28,14 +27,14 @@ echo ""
 
 # Try multiple installation methods
 echo "📦 Attempting installation method 1: dfx canister install..."
-if echo "yes" | dfx canister install --network ic raven_ai --wasm "$WASM_FILE" --mode reinstall 2>&1 | grep -v "ColorOutOfRange\|panic\|backtrace" | tail -5; then
+if echo "yes" | ./scripts/dfx_safe.sh canister install --network ic raven_ai --wasm "$WASM_FILE" --mode reinstall 2>&1 | grep -v "ColorOutOfRange\|panic\|backtrace" | tail -5; then
     echo "✅ Installation successful!"
     exit 0
 fi
 
 echo ""
 echo "📦 Attempting installation method 2: dfx deploy..."
-if dfx deploy --network ic raven_ai --no-wallet 2>&1 | grep -v "ColorOutOfRange\|panic\|backtrace" | tail -10; then
+if ./scripts/dfx_safe.sh deploy --network ic raven_ai --no-wallet 2>&1 | grep -v "ColorOutOfRange\|panic\|backtrace" | tail -10; then
     echo "✅ Installation successful!"
     exit 0
 fi
@@ -47,7 +46,7 @@ node install_raven_ai_direct.mjs 2>&1 | tail -10
 echo ""
 echo "🧪 Verifying installation..."
 sleep 3
-if dfx canister call --network ic raven_ai get_article_stats '()' 2>&1 | grep -v "ColorOutOfRange\|panic\|backtrace" | head -3; then
+if ./scripts/dfx_safe.sh canister call --network ic raven_ai get_article_stats '()' 2>&1 | grep -v "ColorOutOfRange\|panic\|backtrace" | head -3; then
     echo "✅ raven_ai is working!"
 else
     echo "❌ Installation may have failed. Check output above."

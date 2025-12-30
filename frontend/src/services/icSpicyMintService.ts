@@ -1,30 +1,16 @@
 /**
  * IC SPICY Minting Service
- * Connects to the IC SPICY canister for NFT minting
+ * Connects to the NFT canister for NFT minting (Forge uses the main NFT canister)
  */
 
-import { Actor, HttpAgent } from '@dfinity/agent';
+import { Actor, HttpAgent, Identity } from '@dfinity/agent';
 import { Principal } from '@dfinity/principal';
-import { AuthClient } from '@dfinity/auth-client';
+import { CANISTER_IDS, getICHost, isMainnet } from './canisterConfig';
+import { getActiveIdentity, getOrCreateAgent } from './session';
 
-// IC SPICY canister ID - get from canisterConfig
-const getICSpicyCanisterId = (): string => {
-  // Check environment variable first
-  if (import.meta.env.VITE_ICSPICY_CANISTER_ID) {
-    return import.meta.env.VITE_ICSPICY_CANISTER_ID;
-  }
-  
-  // Try to get from canisterConfig
-  try {
-    const { CANISTER_IDS } = require('./canisterConfig');
-    if (CANISTER_IDS.icspicy) {
-      return CANISTER_IDS.icspicy;
-    }
-  } catch (e) {
-    // Fall through to error
-  }
-  
-  throw new Error('IC SPICY canister ID not configured. Set VITE_ICSPICY_CANISTER_ID in .env or add to canisterConfig.ts');
+// Use the main NFT canister for Forge minting
+const getNFTCanisterId = (): string => {
+  return CANISTER_IDS.nft;
 };
 
 // Simplified interface for IC SPICY minting
@@ -38,31 +24,15 @@ export interface MintResponse {
   success: boolean;
 }
 
-// Create actor for IC SPICY canister
-async function createICSpicyActor(authClient: AuthClient | null): Promise<any> {
-  // Use canisterConfig for consistent mainnet detection
-  const { getICHost, isMainnet } = await import('./canisterConfig');
-  const { idlFactory } = await import('../declarations/icspicy');
+// Create actor for NFT canister
+async function createNFTActor(identity: Identity | null): Promise<any> {
+  // Import NFT canister declarations (same pattern as NFTService)
+  const { idlFactory } = await import('../declarations/nft');
   const isLocal = !isMainnet();
   
-  let agent: HttpAgent;
-  if (authClient) {
-    const identity = authClient.getIdentity();
-    agent = new HttpAgent({
-      identity,
-      host: getICHost(),
-    });
-  } else {
-    agent = new HttpAgent({
-      host: getICHost(),
-    });
-  }
+  const agent = await getOrCreateAgent(identity);
 
-  if (isLocal) {
-    await agent.fetchRootKey();
-  }
-
-  const canisterId = getICSpicyCanisterId();
+  const canisterId = getNFTCanisterId();
   
   return Actor.createActor(idlFactory, {
     agent,
@@ -75,17 +45,47 @@ export class ICSpicyMintService {
    * Mint a single NFT
    */
   static async mint(recipient?: Principal): Promise<MintResponse> {
-    const authClient = await AuthClient.create();
-    const actor = await createICSpicyActor(authClient);
+    const identity = getActiveIdentity();
+    if (!identity) {
+      throw new Error('Please connect a wallet before minting.');
+    }
+    const actor = await createNFTActor(identity);
+    const caller = identity.getPrincipal();
+    const mintTo = recipient || caller;
     
     try {
-      const result = await actor.mint(recipient ? [recipient] : []);
-      return {
-        token_ids: result.token_ids.map((id: any) => BigInt(id)),
-        success: result.success,
+      // Use NFT canister's mint method
+      const mintArgs = {
+        to: mintTo,
+        name: `Forge Genesis NFT #${Date.now()}`,
+        description: 'Exclusive Genesis NFT minted from The Forge NFT Minter.',
+        image: 'https://3kpgg-eaaaa-aaaao-a4xdq-cai.icp0.io/forge-genesis.png', // Main assets canister
+        attributes: [
+          {
+            trait_type: 'Collection',
+            value: 'The Forge Genesis',
+            rarity_score: 1,
+          },
+          {
+            trait_type: 'Platform',
+            value: 'Internet Computer',
+            rarity_score: 1,
+          }
+        ],
       };
+      
+      const result = await actor.mint(mintArgs);
+      
+      if ('Ok' in result) {
+        return {
+          token_ids: [BigInt(result.Ok)],
+          success: true,
+        };
+      } else {
+        throw new Error(result.Err || 'Minting failed');
+      }
     } catch (error) {
-      console.error('IC SPICY mint error:', error);
+      console.error('Forge NFT mint error:', error);
       throw error;
     }
   }
@@ -94,22 +94,45 @@ export class ICSpicyMintService {
    * Batch mint NFTs
    */
   static async batchMint(request: MintRequest): Promise<MintResponse> {
-    const authClient = await AuthClient.create();
-    const actor = await createICSpicyActor(authClient);
+    const identity = getActiveIdentity();
+    if (!identity) {
+      throw new Error('Please connect a wallet before minting.');
+    }
+    const actor = await createNFTActor(identity);
+    const caller = identity.getPrincipal();
+    const mintTo = request.recipient || caller;
     
     try {
-      const mintRequest = {
-        recipient: request.recipient ? [request.recipient] : [],
-        quantity: request.quantity,
-      };
+      // Create batch mint requests
+      const mintArgs = Array.from({ length: Number(request.quantity) }, (_, i) => ({
+        to: mintTo,
+        name: `Forge Genesis NFT #${Date.now()}-${i}`,
+        description: 'Exclusive Genesis NFT minted from The Forge NFT Minter.',
+        image: 'https://3kpgg-eaaaa-aaaao-a4xdq-cai.icp0.io/forge-genesis.png',
+        attributes: [
+          {
+            trait_type: 'Collection',
+            value: 'The Forge Genesis',
+            rarity_score: 1,
+          },
+        ],
+      }));
       
-      const result = await actor.batch_mint(mintRequest);
+      const results = await actor.batch_mint(mintArgs);
+      
+      const tokenIds: bigint[] = [];
+      for (const result of results) {
+        if ('Ok' in result) {
+          tokenIds.push(BigInt(result.Ok));
+        }
+      }
+      
       return {
-        token_ids: result.token_ids.map((id: any) => BigInt(id)),
-        success: result.success,
+        token_ids: tokenIds,
+        success: tokenIds.length > 0,
       };
     } catch (error) {
-      console.error('IC SPICY batch mint error:', error);
+      console.error('Forge NFT batch mint error:', error);
       throw error;
     }
   }
@@ -118,14 +141,14 @@ export class ICSpicyMintService {
    * Get user's NFTs
    */
   static async getUserTokens(principal: Principal): Promise<bigint[]> {
-    const authClient = await AuthClient.create();
-    const actor = await createICSpicyActor(authClient);
+    // Query can be anonymous, but if we have an active identity, use it.
+    const actor = await createNFTActor(getActiveIdentity());
     
     try {
-      const tokens = await actor.get_user_tokens(principal);
+      const tokens = await actor.icrc7_tokens_of(principal);
       return tokens.map((id: any) => BigInt(id));
     } catch (error) {
-      console.error('IC SPICY get user tokens error:', error);
+      console.error('Forge NFT get user tokens error:', error);
       throw error;
     }
   }
@@ -134,63 +157,40 @@ export class ICSpicyMintService {
    * Get NFT metadata by token ID
    */
   static async getNFTMetadata(tokenId: bigint): Promise<{ metadata?: string; rarity?: string } | null> {
-    const authClient = await AuthClient.create();
-    const actor = await createICSpicyActor(authClient);
+    // Query can be anonymous, but if we have an active identity, use it.
+    const actor = await createNFTActor(getActiveIdentity());
     
     try {
       const metadata = await actor.get_nft_metadata(Number(tokenId));
-      if (!metadata || metadata.length === 0) {
+      if (!metadata) {
         return null;
       }
       
-      // Parse metadata JSON if available
-      let parsedMetadata: any = {};
-      let rarity = 'common';
-      
-      try {
-        parsedMetadata = JSON.parse(metadata);
-        rarity = parsedMetadata.rarity || parsedMetadata.traits?.rarity || 'common';
-      } catch (e) {
-        // If not JSON, try to extract rarity from metadata string
-        if (metadata.toLowerCase().includes('legendary')) rarity = 'legendary';
-        else if (metadata.toLowerCase().includes('epic')) rarity = 'epic';
-        else if (metadata.toLowerCase().includes('rare')) rarity = 'rare';
-      }
+      // Convert metadata to JSON string
+      const metadataStr = JSON.stringify(metadata);
+      const rarity = metadata.rarity 
+        ? metadata.rarity.toLowerCase().replace('common', 'common').replace('uncommon', 'rare').replace('rare', 'rare').replace('epic', 'epic').replace('legendary', 'legendary')
+        : 'common';
       
       return {
-        metadata,
-        rarity: rarity.toLowerCase() as 'common' | 'rare' | 'epic' | 'legendary',
+        metadata: metadataStr,
+        rarity: rarity as 'common' | 'rare' | 'epic' | 'legendary',
       };
     } catch (error) {
-      console.error('IC SPICY get NFT metadata error:', error);
+      console.error('Forge NFT get metadata error:', error);
       return null;
     }
   }
 
   /**
    * Get transaction history for a user
+   * Note: NFT canister doesn't have transaction history, so we return empty array
+   * In production, you'd query a separate transaction ledger canister
    */
   static async getUserTransactions(principal: Principal): Promise<Transaction[]> {
-    const authClient = await AuthClient.create();
-    const actor = await createICSpicyActor(authClient);
-    
-    try {
-      const backendTxs = await actor.get_user_transactions(principal) as any[];
-      
-      return backendTxs.map((tx: any) => ({
-        id: tx.id.toString(),
-        type: tx.transaction_type.Mint !== undefined ? 'mint' as const :
-              tx.transaction_type.Transfer !== undefined ? 'transfer' as const : 'claim' as const,
-        tokenId: tx.token_id.toString(),
-        from: tx.from?.[0] ? Principal.fromText(tx.from[0]).toString() : undefined,
-        to: typeof tx.to === 'object' && 'toText' in tx.to ? tx.to.toText() : String(tx.to),
-        timestamp: Number(tx.timestamp) / 1_000_000, // Convert nanoseconds to milliseconds
-        memo: tx.memo?.[0] || undefined,
-      }));
-    } catch (error) {
-      console.error('IC SPICY get user transactions error:', error);
-      throw error;
-    }
+    // NFT canister doesn't track transaction history
+    // Return empty array - in production, integrate with a transaction ledger
+    return [];
   }
 }
 

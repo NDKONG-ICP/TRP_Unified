@@ -4,129 +4,12 @@
  * This avoids CORS issues by using HTTP outcalls from the canister
  */
 
-import { Actor, HttpAgent, Identity } from '@dfinity/agent';
+import { Identity } from '@dfinity/agent';
 import { Principal } from '@dfinity/principal';
 import { getCanisterId, getICHost, isMainnet } from './canisterConfig';
 import { createActorWithIdl } from './actorFactory';
-
-// IDL Factory for raven_ai canister
-const ravenAIIdlFactory = ({ IDL }: { IDL: any }) => {
-  const VoiceSynthesisRequest = IDL.Record({
-    text: IDL.Text,
-    voice_id: IDL.Opt(IDL.Text),
-    model_id: IDL.Opt(IDL.Text),
-    stability: IDL.Opt(IDL.Float32),
-    similarity_boost: IDL.Opt(IDL.Float32),
-  });
-
-  const VoiceSynthesisResponse = IDL.Record({
-    audio_base64: IDL.Text,
-    duration_ms: IDL.Nat64,
-    characters_used: IDL.Nat32,
-  });
-
-  const ChatMessage = IDL.Record({
-    role: IDL.Text,
-    content: IDL.Text,
-    timestamp: IDL.Nat64,
-  });
-
-  const CouncilResponse = IDL.Record({
-    llm_name: IDL.Text,
-    response: IDL.Text,
-    confidence: IDL.Float32,
-    tokens_used: IDL.Nat64,
-    latency_ms: IDL.Nat64,
-    timestamp: IDL.Nat64,
-    error: IDL.Opt(IDL.Text),
-  });
-
-  const ConsensusResult = IDL.Record({
-    final_response: IDL.Text,
-    confidence_score: IDL.Float32,
-    agreement_level: IDL.Float32,
-    key_points: IDL.Vec(IDL.Text),
-    dissenting_views: IDL.Vec(IDL.Text),
-    synthesis_method: IDL.Text,
-  });
-
-  const AICouncilSession = IDL.Record({
-    session_id: IDL.Text,
-    user: IDL.Principal,
-    query: IDL.Text,
-    system_prompt: IDL.Opt(IDL.Text),
-    context: IDL.Vec(ChatMessage),
-    responses: IDL.Vec(CouncilResponse),
-    consensus: IDL.Opt(ConsensusResult),
-    created_at: IDL.Nat64,
-    completed_at: IDL.Opt(IDL.Nat64),
-    total_tokens_used: IDL.Nat64,
-    total_cost_usd: IDL.Float64,
-  });
-
-  const ChatResponse = IDL.Record({
-    message: IDL.Text,
-    agent_id: IDL.Opt(IDL.Nat64),
-    conversation_id: IDL.Text,
-    tokens_used: IDL.Nat32,
-  });
-
-  return IDL.Service({
-    // AI Chat - routes through backend LLMs
-    chat: IDL.Func(
-      [IDL.Opt(IDL.Nat64), IDL.Text, IDL.Opt(IDL.Text)],
-      [IDL.Variant({ Ok: ChatResponse, Err: IDL.Text })],
-      []
-    ),
-    
-    // AI Council - queries multiple LLMs via HTTP outcalls
-    // Backend signature: (text, opt text, vec ChatMessage, opt nat64) -> (variant { Ok: AICouncilSession; Err: text })
-    query_ai_council: IDL.Func(
-      [IDL.Text, IDL.Opt(IDL.Text), IDL.Vec(ChatMessage), IDL.Opt(IDL.Nat64)],
-      [IDL.Variant({ Ok: AICouncilSession, Err: IDL.Text })],
-      []
-    ),
-    
-    // Start 3-day free demo subscription
-    start_demo: IDL.Func(
-      [],
-      [IDL.Variant({ Ok: IDL.Record({
-        user: IDL.Principal,
-        plan: IDL.Variant({
-          Demo: IDL.Null,
-          Monthly: IDL.Null,
-          Yearly: IDL.Null,
-          Lifetime: IDL.Null,
-          NFTHolder: IDL.Null,
-        }),
-        started_at: IDL.Nat64,
-        expires_at: IDL.Opt(IDL.Nat64),
-        is_active: IDL.Bool,
-        payment_history: IDL.Vec(IDL.Text),
-      }), Err: IDL.Text })],
-      []
-    ),
-    
-    // Voice synthesis - proxied through backend
-    synthesize_voice: IDL.Func(
-      [VoiceSynthesisRequest],
-      [IDL.Variant({ Ok: VoiceSynthesisResponse, Err: IDL.Text })],
-      []
-    ),
-    
-    // Subscription status
-    check_subscription: IDL.Func(
-      [IDL.Principal],
-      [IDL.Variant({ Ok: IDL.Record({
-        is_active: IDL.Bool,
-        plan: IDL.Opt(IDL.Text),
-        expires_at: IDL.Opt(IDL.Nat64),
-        demo_available: IDL.Bool,
-      }), Err: IDL.Text })],
-      ['query']
-    ),
-  });
-};
+import { idlFactory as ravenAiIdlFactory } from '../declarations/raven_ai';
+import type { AICouncilSession, ChatMessage, VoiceSynthesisResponse as RavenVoiceSynthesisResponse } from '../declarations/raven_ai/raven_ai.did';
 
 // Response types
 export interface ChatResponse {
@@ -146,9 +29,8 @@ export interface AICouncilResponse {
 }
 
 export interface VoiceSynthesisResponse {
-  audioBase64: string;
-  durationMs: bigint;
-  charactersUsed: number;
+  audioData: Uint8Array;
+  contentType: string;
 }
 
 export interface SubscriptionStatus {
@@ -179,7 +61,7 @@ export class BackendAIService {
     
     // Use actorFactory for proper wallet abstraction (supports Plug, II, OISY, etc.)
     const canisterId = getCanisterId('raven_ai');
-    this.actor = await createActorWithIdl(canisterId, ravenAIIdlFactory, identity);
+    this.actor = await createActorWithIdl(canisterId, ravenAiIdlFactory as any, identity);
 
     this.isInitialized = true;
   }
@@ -197,22 +79,22 @@ export class BackendAIService {
     }
 
     try {
+      // Canister signature: chat: (opt nat64, text, opt text) -> (variant { Ok: text; Err: text })
       const result = await this.actor.chat(
         agentId ? [agentId] : [],
         message,
-        conversationId ? [conversationId] : []
-      );
+        [] // system_prompt is optional; companion passes systemPrompt via query_ai_council
+      ) as { Ok?: string; Err?: string };
 
-      if ('Ok' in result) {
-        return {
-          message: result.Ok.message,
-          agentId: result.Ok.agent_id?.[0],
-          conversationId: result.Ok.conversation_id,
-          tokensUsed: Number(result.Ok.tokens_used),
-        };
-      } else {
+      if (result.Err) {
         throw new Error(result.Err);
       }
+      return {
+        message: result.Ok ?? '',
+        agentId,
+        conversationId: conversationId || `c_${Date.now()}`,
+        tokensUsed: 0,
+      };
     } catch (error: any) {
       console.error('Backend chat error:', error);
       // Return a fallback response if backend fails
@@ -238,7 +120,7 @@ export class BackendAIService {
 
     try {
       // Convert context string to ChatMessage array
-      const contextMessages: Array<{ role: string; content: string; timestamp: bigint }> = [];
+      const contextMessages: ChatMessage[] = [];
       if (context) {
         // Parse context string (format: "role: content\nrole: content")
         const lines = context.split('\n').filter(l => l.trim());
@@ -259,46 +141,11 @@ export class BackendAIService {
         systemPrompt ? [systemPrompt] : [],
         contextMessages,
         [] // token_id (optional)
-      );
+      ) as { Ok?: AICouncilSession; Err?: string };
 
-      if ('Ok' in result) {
-        const session = result.Ok;
-        // Extract consensus data from session
-        if (session.consensus) {
-          const consensus = session.consensus;
-          // Convert CouncilResponse array to tuple array for compatibility
-          const providerResponses: Array<[string, string]> = session.responses
-            .filter((r: any) => !r.error)
-            .map((r: any) => [r.llm_name, r.response]);
-          
-          return {
-            finalResponse: consensus.final_response,
-            confidenceScore: consensus.confidence_score,
-            providerResponses,
-            totalProvidersQueried: session.responses.length,
-            successfulProviders: providerResponses.length,
-            consensusMethod: consensus.synthesis_method,
-          };
-        } else {
-          // No consensus yet, use responses directly
-          const providerResponses: Array<[string, string]> = session.responses
-            .filter((r: any) => !r.error)
-            .map((r: any) => [r.llm_name, r.response]);
-          
-          return {
-            finalResponse: providerResponses.length > 0 
-              ? providerResponses[0][1] 
-              : 'Processing...',
-            confidenceScore: 0.5,
-            providerResponses,
-            totalProvidersQueried: session.responses.length,
-            successfulProviders: providerResponses.length,
-            consensusMethod: 'direct',
-          };
-        }
-      } else {
+      if (result.Err) {
         // If subscription required, try to start demo automatically
-        if (result.Err && result.Err.includes('subscription')) {
+        if (result.Err.includes('subscription')) {
           // Starting free demo subscription
           try {
             await this.actor.start_demo();
@@ -308,38 +155,10 @@ export class BackendAIService {
               systemPrompt ? [systemPrompt] : [],
               contextMessages,
               [] // token_id (optional)
-            );
-            if ('Ok' in retryResult) {
-              const session = retryResult.Ok;
-              if (session.consensus) {
-                const consensus = session.consensus;
-                const providerResponses: Array<[string, string]> = session.responses
-                  .filter((r: any) => !r.error)
-                  .map((r: any) => [r.llm_name, r.response]);
-                
-                return {
-                  finalResponse: consensus.final_response,
-                  confidenceScore: consensus.confidence_score,
-                  providerResponses,
-                  totalProvidersQueried: session.responses.length,
-                  successfulProviders: providerResponses.length,
-                  consensusMethod: consensus.synthesis_method,
-                };
-              } else {
-                // No consensus, use first successful response
-                const providerResponses: Array<[string, string]> = session.responses
-                  .filter((r: any) => !r.error)
-                  .map((r: any) => [r.llm_name, r.response]);
-                
-                return {
-                  finalResponse: providerResponses.length > 0 ? providerResponses[0][1] : 'Processing...',
-                  confidenceScore: 0.5,
-                  providerResponses,
-                  totalProvidersQueried: session.responses.length,
-                  successfulProviders: providerResponses.length,
-                  consensusMethod: 'direct',
-                };
-              }
+            ) as { Ok?: AICouncilSession; Err?: string };
+
+            if (!retryResult.Err && retryResult.Ok) {
+              return this.sessionToCouncilResponse(retryResult.Ok);
             }
           } catch (demoError) {
             // Demo start failed, continuing without demo
@@ -347,11 +166,43 @@ export class BackendAIService {
         }
         throw new Error(result.Err);
       }
+
+      if (!result.Ok) {
+        throw new Error('AI Council returned empty result');
+      }
+      return this.sessionToCouncilResponse(result.Ok);
     } catch (error: any) {
       console.error('AI Council error:', error);
       // Return fallback
       return this.generateFallbackCouncilResponse(query);
     }
+  }
+
+  private sessionToCouncilResponse(session: AICouncilSession): AICouncilResponse {
+    const providerResponses: Array<[string, string]> = (session.responses || [])
+      .filter((r) => r.success && (!r.error || r.error.length === 0))
+      .map((r) => [r.model, r.response]);
+
+    const consensus = session.consensus?.[0];
+    if (consensus) {
+      return {
+        finalResponse: consensus.final_response,
+        confidenceScore: consensus.confidence_score,
+        providerResponses,
+        totalProvidersQueried: session.responses.length,
+        successfulProviders: providerResponses.length,
+        consensusMethod: consensus.synthesis_method,
+      };
+    }
+
+    return {
+      finalResponse: providerResponses.length > 0 ? providerResponses[0][1] : 'Processing...',
+      confidenceScore: 0.5,
+      providerResponses,
+      totalProvidersQueried: session.responses.length,
+      successfulProviders: providerResponses.length,
+      consensusMethod: 'direct',
+    };
   }
 
   /**
@@ -379,18 +230,19 @@ export class BackendAIService {
         similarity_boost: [0.75],
       };
 
-      const result = await this.actor.synthesize_voice(request);
+      const result = await this.actor.synthesize_voice(request) as { Ok?: RavenVoiceSynthesisResponse; Err?: string };
 
-      if ('Ok' in result) {
+      if (!result.Err && result.Ok) {
+        const bytes = Array.isArray(result.Ok.audio_data)
+          ? new Uint8Array(result.Ok.audio_data as number[])
+          : new Uint8Array(result.Ok.audio_data as Uint8Array);
         return {
-          audioBase64: result.Ok.audio_base64,
-          durationMs: result.Ok.duration_ms,
-          charactersUsed: Number(result.Ok.characters_used),
+          audioData: bytes,
+          contentType: result.Ok.content_type,
         };
-      } else {
-        console.error('Voice synthesis error:', result.Err);
-        return null;
       }
+      console.error('Voice synthesis error:', result.Err);
+      return null;
     } catch (error: any) {
       console.error('Voice synthesis error:', error);
       return null;
@@ -433,16 +285,11 @@ export class BackendAIService {
   async playVoice(text: string): Promise<void> {
     const voiceData = await this.synthesizeVoice(text);
 
-    if (voiceData?.audioBase64) {
-      // Decode base64 and play
-      const audioData = atob(voiceData.audioBase64);
-      const arrayBuffer = new ArrayBuffer(audioData.length);
-      const view = new Uint8Array(arrayBuffer);
-      for (let i = 0; i < audioData.length; i++) {
-        view[i] = audioData.charCodeAt(i);
-      }
-
-      const blob = new Blob([arrayBuffer], { type: 'audio/mpeg' });
+    if (voiceData?.audioData && voiceData.audioData.length > 0) {
+      // Convert to a plain ArrayBuffer to avoid TS/dom lib edge-cases around SharedArrayBuffer typing.
+      // Force a plain Uint8Array copy so DOM typing doesn't treat it as SharedArrayBuffer-backed.
+      const bytes = Uint8Array.from(voiceData.audioData);
+      const blob = new Blob([bytes], { type: voiceData.contentType || 'audio/mpeg' });
       const audioUrl = URL.createObjectURL(blob);
       const audio = new Audio(audioUrl);
 
@@ -511,11 +358,11 @@ export class BackendAIService {
     } else if (lowerMessage.includes('axiom') || lowerMessage.includes('nft')) {
       response = "AXIOM NFTs are unique AI agents with persistent memory. There are 5 Genesis NFTs (#1-5) with legendary rarity, plus 295 more available. Each AXIOM has specialized knowledge and can learn from conversations.";
     } else if (lowerMessage.includes('harlee') || lowerMessage.includes('token')) {
-      response = "$HARLEE is our utility token. You can earn it through staking (100/week per NFT), gaming, and content creation. Use it for subscriptions, NFT purchases, and governance.";
+      response = "$HARLEE is our ICRC-1 utility token (100M supply, 8 decimals, ledger: tlm4l-kaaaa-aaaah-qqeha-cai). Earn through: NFT staking (100/week with rarity multipliers up to 3x), Crossword Quest (1/puzzle), gaming, and content tips. Use for AI subscriptions, NFT purchases, governance, and reduced fees.";
     } else if (lowerMessage.includes('wallet') || lowerMessage.includes('connect')) {
       response = "We support Internet Identity, Plug Wallet, and OISY. Click 'Connect' in the header to get started. For the best experience with NFTs, we recommend Plug Wallet.";
     } else if (lowerMessage.includes('stake') || lowerMessage.includes('staking')) {
-      response = "Stake your Sk8 Punks NFTs to earn 100 $HARLEE per week per NFT. Navigate to the Sk8 Punks section and click 'Staking' to get started. Rewards accumulate continuously.";
+      response = "Stake Sk8 Punks NFTs for $HARLEE rewards: Common=100/week, Rare=150/week (1.5x), Epic=200/week (2x), Legendary=300/week (3x). That's up to 15,600 $HARLEE/year per Legendary! Go to Sk8 Punks → Staking.";
     } else {
       response = `Thanks for your question about "${message.substring(0, 30)}...". As RavenAI, I can help with our ecosystem, tokens, NFTs, staking, and features. Please ask something specific about the Raven Project!`;
     }

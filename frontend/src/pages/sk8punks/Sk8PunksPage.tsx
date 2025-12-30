@@ -55,7 +55,8 @@ const SK8_PUNKS_COLLECTION = {
 };
 
 // Staking Reward Rate: 100 $HARLEE per week per NFT (in e8s)
-const WEEKLY_HARLEE_REWARD = BigInt(100_00_000_000); // 100 $HARLEE with 8 decimals
+// 100 $HARLEE * 10^8 decimals = 10,000,000,000 e8s
+const WEEKLY_HARLEE_REWARD = BigInt(10_000_000_000); // 100 $HARLEE with 8 decimals
 const SECONDS_PER_WEEK = 604800;
 
 // Game Types

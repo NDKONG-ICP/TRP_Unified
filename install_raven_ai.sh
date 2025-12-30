@@ -6,9 +6,7 @@ set -e
 
 cd "/Users/williambeck/The Forge NFT Minter/raven-unified-ecosystem"
 
-export NO_COLOR=1
-export TERM=dumb
-unset COLORTERM
+source "./scripts/dfx_safe_env.sh"
 
 echo "🚀 Installing raven_ai canister..."
 echo ""
@@ -16,7 +14,7 @@ echo ""
 # Check if WASM exists
 if [ ! -f "target/wasm32-unknown-unknown/release/raven_ai.wasm" ]; then
     echo "❌ WASM file not found. Building..."
-    dfx build raven_ai --network ic
+    ./scripts/dfx_safe.sh build raven_ai --network ic
 fi
 
 echo "📦 Installing WASM module..."
@@ -24,7 +22,7 @@ echo "   (You will be prompted to confirm - type 'yes')"
 echo ""
 
 # Install with reinstall mode
-dfx canister install --network ic raven_ai \
+./scripts/dfx_safe.sh canister install --network ic raven_ai \
     --wasm target/wasm32-unknown-unknown/release/raven_ai.wasm \
     --mode=reinstall
 

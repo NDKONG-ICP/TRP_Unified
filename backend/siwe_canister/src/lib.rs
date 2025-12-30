@@ -171,11 +171,8 @@ fn format_siwe_message(msg: &SIWEMessage) -> String {
     message
 }
 
-/// Verify Ethereum signature
-/// NOTE: This is a placeholder implementation for deployment
-/// In production, proper ECDSA signature verification should be implemented
+/// Verify Ethereum signature using EIP-191 and EIP-4361
 fn verify_ethereum_signature(message: &str, signature: &str, address: &str) -> bool {
-    // Basic format validation
     let sig_bytes = match hex::decode(signature.strip_prefix("0x").unwrap_or(signature)) {
         Ok(bytes) => bytes,
         Err(_) => return false,
@@ -185,19 +182,52 @@ fn verify_ethereum_signature(message: &str, signature: &str, address: &str) -> b
         return false;
     }
     
-    // Ethereum message prefix
+    let mut r = [0u8; 32];
+    let mut s = [0u8; 32];
+    r.copy_from_slice(&sig_bytes[0..32]);
+    s.copy_from_slice(&sig_bytes[32..64]);
+    let v = sig_bytes[64];
+
+    // Normalize v to 0 or 1
+    let recovery_id = if v >= 27 { v - 27 } else { v };
+    
+    // Ethereum signed message prefix
     let prefix = format!("\x19Ethereum Signed Message:\n{}", message.len());
-    let prefixed_message = format!("{}{}", prefix, message);
-    
-    // Hash the prefixed message
     let mut hasher = Keccak256::new();
-    hasher.update(prefixed_message.as_bytes());
-    let _message_hash = hasher.finalize();
+    hasher.update(prefix.as_bytes());
+    hasher.update(message.as_bytes());
+    let message_hash = hasher.finalize();
+
+    // Recover public key
+    let recovery_id = match libsecp256k1::RecoveryId::parse(recovery_id) {
+        Ok(id) => id,
+        Err(_) => return false,
+    };
     
-    // TODO: Implement proper ECDSA signature recovery and verification
-    // For now, accept valid format signatures
-    // In production, this must verify the signature cryptographically
-    !address.is_empty() && !signature.is_empty()
+    let signature = match libsecp256k1::Signature::parse_standard(&sig_bytes[0..64]) {
+        Ok(sig) => sig,
+        Err(_) => return false,
+    };
+
+    let message_hash_fixed = {
+        let mut arr = [0u8; 32];
+        arr.copy_from_slice(&message_hash);
+        libsecp256k1::Message::parse(&arr)
+    };
+
+    let pubkey = match libsecp256k1::recover(&message_hash_fixed, &signature, &recovery_id) {
+        Ok(pk) => pk,
+        Err(_) => return false,
+    };
+
+    // Derived address from public key
+    let pubkey_bytes = pubkey.serialize();
+    let mut hasher = Keccak256::new();
+    hasher.update(&pubkey_bytes[1..]); // Skip the 0x04 prefix for uncompressed keys
+    let hash = hasher.finalize();
+    let recovered_address = format!("0x{}", hex::encode(&hash[12..]));
+    
+    recovered_address.to_lowercase() == address.to_lowercase()
 }
 
 /// Derive ICP principal from Ethereum address

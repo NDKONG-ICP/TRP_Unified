@@ -26,6 +26,7 @@ export const HALOUpload: React.FC<HALOUploadProps> = ({
   processing,
   setProcessing
 }) => {
+  const { isAuthenticated, identity } = useAuthStore();
   const [file, setFile] = useState<File | null>(null);
   const [fileType, setFileType] = useState<string>('');
   const [format, setFormat] = useState<CitationFormat>('MLA');

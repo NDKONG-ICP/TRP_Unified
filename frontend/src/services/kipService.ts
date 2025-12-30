@@ -89,6 +89,60 @@ const kipIdlFactory = ({ IDL }: { IDL: any }) => {
     'Err': IDL.Text,
   });
 
+  // Linked wallets
+  const LinkedWallets = IDL.Record({
+    solana_pubkeys: IDL.Vec(IDL.Text),
+    sui_addresses: IDL.Vec(IDL.Text),
+    evm_addresses: IDL.Vec(IDL.Text),
+  });
+
+  const SIWSMessage = IDL.Record({
+    domain: IDL.Text,
+    address: IDL.Text,
+    statement: IDL.Opt(IDL.Text),
+    uri: IDL.Text,
+    version: IDL.Text,
+    chain_id: IDL.Text,
+    nonce: IDL.Text,
+    issued_at: IDL.Text,
+    expiration_time: IDL.Opt(IDL.Text),
+    not_before: IDL.Opt(IDL.Text),
+    request_id: IDL.Opt(IDL.Text),
+    resources: IDL.Opt(IDL.Vec(IDL.Text)),
+  });
+
+  const SISMessage = IDL.Record({
+    domain: IDL.Text,
+    address: IDL.Text,
+    statement: IDL.Opt(IDL.Text),
+    uri: IDL.Text,
+    version: IDL.Text,
+    chain_id: IDL.Text,
+    nonce: IDL.Text,
+    issued_at: IDL.Text,
+    expiration_time: IDL.Opt(IDL.Text),
+    not_before: IDL.Opt(IDL.Text),
+    request_id: IDL.Opt(IDL.Text),
+    resources: IDL.Opt(IDL.Vec(IDL.Text)),
+  });
+
+  const LinkPayload = IDL.Variant({
+    Solana: SIWSMessage,
+    Sui: SISMessage,
+  });
+
+  const WalletLinkChallenge = IDL.Record({
+    kind: IDL.Text,
+    issued_at: IDL.Nat64,
+    expires_at: IDL.Nat64,
+    payload: LinkPayload,
+  });
+
+  const WalletLinkResult = IDL.Variant({
+    Ok: WalletLinkChallenge,
+    Err: IDL.Text,
+  });
+
   const LeaderboardEntry = IDL.Tuple(KIPProfile, IDL.Nat64);
 
   const PlatformStats = IDL.Record({
@@ -114,6 +168,12 @@ const kipIdlFactory = ({ IDL }: { IDL: any }) => {
     'subscribe_newsletter': IDL.Func([IDL.Text, IDL.Opt(MailingAddress)], [VoidResult], []),
     'get_stats': IDL.Func([], [PlatformStats], ['query']),
     'get_all_profiles': IDL.Func([], [IDL.Vec(KIPProfile)], ['query']),
+
+    // Linked wallets
+    'start_link_wallet': IDL.Func([IDL.Text], [WalletLinkResult], []),
+    'confirm_link_wallet': IDL.Func([LinkPayload, IDL.Text], [VoidResult], []),
+    'get_linked_wallets': IDL.Func([IDL.Principal], [IDL.Opt(LinkedWallets)], ['query']),
+    'get_my_linked_wallets': IDL.Func([], [IDL.Opt(LinkedWallets)], ['query']),
   });
 };
 
@@ -175,6 +235,46 @@ export interface PlatformStats {
   pendingDocs: number;
 }
 
+export interface LinkedWallets {
+  solanaPubkeys: string[];
+  suiAddresses: string[];
+  evmAddresses: string[];
+}
+
+export interface SIWSMessagePayload {
+  domain: string;
+  address: string;
+  statement?: string;
+  uri: string;
+  version: string;
+  chainId: string;
+  nonce: string;
+  issuedAt: string;
+  expirationTime?: string;
+  notBefore?: string;
+  requestId?: string;
+  resources?: string[];
+}
+
+export interface SISMessagePayload {
+  domain: string;
+  address: string;
+  statement?: string;
+  uri: string;
+  version: string;
+  chainId: string;
+  nonce: string;
+  issuedAt: string;
+  expirationTime?: string;
+  notBefore?: string;
+  requestId?: string;
+  resources?: string[];
+}
+
+export type LinkPayload =
+  | { Solana: any }
+  | { Sui: any };
+
 export interface ProfileUpdateRequest {
   displayName?: string;
   bio?: string;
@@ -190,12 +290,15 @@ export interface ProfileUpdateRequest {
 export class KIPService {
   private actor: any = null;
   private agent: HttpAgent | null = null;
+  private identity: Identity | null = null;
+  private platformStatsSupported: boolean | null = null;
 
   async init(identity?: Identity): Promise<void> {
+    this.identity = identity ?? null;
     const host = getICHost();
     this.agent = new HttpAgent({ identity, host });
     
-    if (!isMainnet) {
+    if (!isMainnet()) {
       await this.agent.fetchRootKey();
     }
     
@@ -374,13 +477,31 @@ export class KIPService {
   async getPlatformStats(): Promise<PlatformStats> {
     this.ensureActor();
     try {
+      // If we already detected mainnet kip doesn't implement get_stats, don't keep calling it.
+      if (this.platformStatsSupported === false) {
+        return { totalProfiles: 0, verifiedProfiles: 0, pendingDocs: 0 };
+      }
+
       const result = await this.actor.get_stats();
+      this.platformStatsSupported = true;
       return {
         totalProfiles: Number(result.total_profiles),
         verifiedProfiles: Number(result.verified_profiles),
         pendingDocs: Number(result.pending_docs),
       };
     } catch (error) {
+      const msg = (error as any)?.message ? String((error as any).message) : '';
+      const isMissingMethod =
+        msg.includes("has no query method 'get_stats'") ||
+        msg.includes('method-not-found') ||
+        msg.includes('MethodNotFound');
+
+      if (isMissingMethod) {
+        this.platformStatsSupported = false;
+        console.warn('KIP get_stats not available on this canister; using defaults.');
+        return { totalProfiles: 0, verifiedProfiles: 0, pendingDocs: 0 };
+      }
+
       console.error('Failed to fetch platform stats:', error);
       throw error;
     }
@@ -457,6 +578,43 @@ export class KIPService {
       console.error('Failed to update user stats:', error);
       throw error;
     }
+  }
+
+  private parseLinkedWallets(raw: any): LinkedWallets {
+    return {
+      solanaPubkeys: raw.solana_pubkeys || [],
+      suiAddresses: raw.sui_addresses || [],
+      evmAddresses: raw.evm_addresses || [],
+    };
+  }
+
+  async startLinkWallet(kind: 'phantom' | 'sui'): Promise<any> {
+    this.ensureActor();
+    const res = await this.actor.start_link_wallet(kind);
+    if (res?.Err) throw new Error(res.Err);
+    return res.Ok;
+  }
+
+  async confirmLinkWallet(payload: any, signature: string): Promise<void> {
+    this.ensureActor();
+    const res = await this.actor.confirm_link_wallet(payload, signature);
+    if (res?.Err) throw new Error(res.Err);
+  }
+
+  async getMyLinkedWallets(): Promise<LinkedWallets | null> {
+    this.ensureActor();
+    const res = await this.actor.get_my_linked_wallets();
+    if (!res || (Array.isArray(res) && res.length === 0)) return null;
+    const raw = Array.isArray(res) ? res[0] : res;
+    return this.parseLinkedWallets(raw);
+  }
+
+  async getLinkedWallets(principal: string): Promise<LinkedWallets | null> {
+    this.ensureActor();
+    const res = await this.actor.get_linked_wallets(Principal.fromText(principal));
+    if (!res || (Array.isArray(res) && res.length === 0)) return null;
+    const raw = Array.isArray(res) ? res[0] : res;
+    return this.parseLinkedWallets(raw);
   }
 }
 

@@ -9,7 +9,7 @@ import { Principal } from '@dfinity/principal';
 interface UserNFT {
   id: string;
   name: string;
-  rarity: 'common' | 'rare' | 'epic' | 'legendary';
+  rarity: 'common' | 'uncommon' | 'rare' | 'epic' | 'legendary';
   tokenId: bigint;
 }
 
@@ -20,12 +20,7 @@ export default function WalletPage() {
   const [ownedNFTs, setOwnedNFTs] = useState<UserNFT[]>([]);
   const [isLoadingNFTs, setIsLoadingNFTs] = useState(false);
   const [nftError, setNftError] = useState<string | null>(null);
-  const [transactions, setTransactions] = useState<Array<{
-    type: 'mint' | 'transfer' | 'claim';
-    nft: string;
-    date: string;
-    txId: string;
-  }>>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [isLoadingTransactions, setIsLoadingTransactions] = useState(false);
 
   const copyPrincipal = () => {
@@ -80,7 +75,10 @@ export default function WalletPage() {
           // Use metadata rarity if available, otherwise fallback to simplified calculation
           let rarity: UserNFT['rarity'] = 'common';
           if (metadata?.rarity) {
-            rarity = metadata.rarity;
+            const r = (metadata.rarity as any) as string;
+            if (['common', 'uncommon', 'rare', 'epic', 'legendary'].includes(r)) {
+              rarity = r as any;
+            }
           } else {
             const rarityIndex = Number(tokenId) % 4;
             const rarities: UserNFT['rarity'][] = ['common', 'rare', 'epic', 'legendary'];
@@ -120,19 +118,7 @@ export default function WalletPage() {
       setIsLoadingTransactions(true);
       try {
         const backendTxs = await ICSpicyMintService.getUserTransactions(Principal.fromText(principal.toString()));
-        
-        // Convert to frontend format
-        const formattedTxs = backendTxs.map(tx => {
-          const nftName = ownedNFTs.find(nft => nft.tokenId.toString() === tx.tokenId)?.name || `IC Spicy #${tx.tokenId}`;
-          return {
-            type: tx.type,
-            nft: nftName,
-            date: new Date(tx.timestamp).toLocaleDateString(),
-            txId: tx.id,
-          };
-        });
-        
-        setTransactions(formattedTxs);
+        setTransactions(backendTxs);
       } catch (error: any) {
         console.error('Failed to fetch transactions:', error);
         setTransactions([]);
@@ -311,32 +297,33 @@ export default function WalletPage() {
             </>
           ) : (
             <div className="space-y-3">
-              {transactions.map((tx) => (
+                {transactions.map((tx) => (
                 <div
-                  key={tx.txId}
+                  key={tx.id}
                   className="glass rounded-xl p-4 border border-spicy-orange/10 hover:border-spicy-orange/30 transition-all"
                 >
                   <div className="flex items-center gap-4">
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
                       tx.type === 'mint' ? 'bg-green-500/20' :
-                      tx.type === 'receive' ? 'bg-blue-500/20' : 'bg-orange-500/20'
+                      tx.type === 'claim' ? 'bg-purple-500/20' :
+                      'bg-orange-500/20'
                     }`}>
                       {tx.type === 'mint' && <Wallet className="w-5 h-5 text-green-500" />}
-                      {tx.type === 'receive' && <ArrowDownLeft className="w-5 h-5 text-blue-500" />}
-                      {tx.type === 'send' && <ArrowUpRight className="w-5 h-5 text-orange-500" />}
+                      {tx.type === 'claim' && <ArrowDownLeft className="w-5 h-5 text-purple-500" />}
+                      {tx.type === 'transfer' && <ArrowUpRight className="w-5 h-5 text-orange-500" />}
                     </div>
                     <div className="flex-1">
-                      <p className="font-medium text-white capitalize">{tx.type} {tx.nft}</p>
+                      <p className="font-medium text-white capitalize">{tx.type} #{tx.tokenId}</p>
                       <p className="text-sm text-silver-500">
-                        {tx.from && `From: ${tx.from}`}
-                        {tx.to && `To: ${tx.to}`}
+                        {tx.from ? `From: ${tx.from}` : null}
+                        {tx.to ? `To: ${tx.to}` : null}
                         {tx.type === 'mint' && 'Minted'}
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm text-silver-400">{tx.date}</p>
+                      <p className="text-sm text-silver-400">{new Date(tx.timestamp).toLocaleDateString()}</p>
                       <a
-                        href={`https://dashboard.internetcomputer.org/tx/${tx.txId}`}
+                        href={`https://dashboard.internetcomputer.org/tx/${tx.id}`}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-xs text-spicy-orange hover:underline flex items-center justify-end mt-1"

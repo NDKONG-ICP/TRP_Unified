@@ -20,8 +20,28 @@ use std::cell::RefCell;
 
 // Memory IDs
 const MODEL_SHARDS_MEM_ID: MemoryId = MemoryId::new(0);
+const SECRETS_MEM_ID: MemoryId = MemoryId::new(1);
 
 type Memory = VirtualMemory<DefaultMemoryImpl>;
+
+#[derive(CandidType, Serialize, Deserialize, Clone, Debug, Default)]
+pub struct SecretConfig {
+    pub hf_api_key: String,
+    pub api_url: String,
+}
+
+impl Storable for SecretConfig {
+    fn to_bytes(&self) -> Cow<[u8]> {
+        Cow::Owned(Encode!(self).unwrap())
+    }
+    fn from_bytes(bytes: Cow<[u8]>) -> Self {
+        Decode!(bytes.as_ref(), Self).unwrap()
+    }
+    const BOUND: ic_stable_structures::storable::Bound = ic_stable_structures::storable::Bound::Bounded {
+        max_size: 100,
+        is_fixed_size: false,
+    };
+}
 
 // Model shard storage
 thread_local! {
@@ -32,6 +52,13 @@ thread_local! {
         RefCell::new(StableBTreeMap::init(
             MEMORY_MANAGER.with(|m| m.borrow().get(MODEL_SHARDS_MEM_ID))
         ));
+
+    static SECRETS: RefCell<StableCell<SecretConfig, Memory>> = RefCell::new(
+        StableCell::init(
+            MEMORY_MANAGER.with(|m| m.borrow().get(SECRETS_MEM_ID)),
+            SecretConfig::default()
+        ).unwrap()
+    );
 }
 
 // ============================================================================
@@ -314,7 +341,8 @@ async fn call_deepseek_r1_api(
     // This allows faster inference and fits within IC instruction limits
     const DEEPSEEK_API_URL: &str = "https://api-inference.huggingface.co/models/deepseek-ai/DeepSeek-R1-Distill-Qwen-7B";
     // NOTE: Set via environment variable or canister initialization
-    const HF_API_KEY: &str = env!("HUGGINGFACE_API_KEY");
+    // Using const with default empty string - key should be set via init args or environment
+    const HF_API_KEY: &str = "";
     
     // Limit prompt length to prevent instruction limit issues
     // IC has ~20M instructions per message execution
@@ -345,6 +373,13 @@ async fn call_deepseek_r1_api(
         }
     });
     
+    let (hf_api_key, api_url) = SECRETS.with(|s| {
+        let secrets = s.borrow().get().clone();
+        let key = if secrets.hf_api_key.is_empty() { HF_API_KEY.to_string() } else { secrets.hf_api_key };
+        let url = if secrets.api_url.is_empty() { DEEPSEEK_API_URL.to_string() } else { secrets.api_url };
+        (key, url)
+    });
+    
     let request_headers = vec![
         HttpHeader {
             name: "Content-Type".to_string(),
@@ -352,7 +387,7 @@ async fn call_deepseek_r1_api(
         },
         HttpHeader {
             name: "Authorization".to_string(),
-            value: format!("Bearer {}", HF_API_KEY),
+            value: format!("Bearer {}", hf_api_key),
         },
     ];
     
@@ -362,7 +397,7 @@ async fn call_deepseek_r1_api(
         .into_bytes();
     
     let request = CanisterHttpRequestArgument {
-        url: DEEPSEEK_API_URL.to_string(),
+        url: api_url,
         method: HttpMethod::POST,
         headers: request_headers,
         body: Some(body_bytes),
@@ -481,6 +516,27 @@ fn get_status() -> (bool, u64, u32) {
     let cycles_available = ic_cdk::api::canister_balance();
     
     (ready, cycles_available, shards_loaded)
+}
+
+#[update]
+fn admin_set_hf_config(api_key: Option<String>, api_url: Option<String>) -> Result<(), String> {
+    let caller = ic_cdk::caller();
+    if !ic_cdk::api::is_controller(&caller) {
+        return Err("Only controllers can update API config".to_string());
+    }
+    
+    SECRETS.with(|s| {
+        let mut secrets = s.borrow().get().clone();
+        if let Some(key) = api_key {
+            secrets.hf_api_key = key;
+        }
+        if let Some(url) = api_url {
+            secrets.api_url = url;
+        }
+        s.borrow_mut().set(secrets).unwrap();
+    });
+    
+    Ok(())
 }
 
 // Export Candid interface

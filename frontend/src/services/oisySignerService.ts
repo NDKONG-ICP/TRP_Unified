@@ -10,6 +10,7 @@
 import { Principal } from '@dfinity/principal';
 import { AuthClient } from '@dfinity/auth-client';
 import { HttpAgent, Identity } from '@dfinity/agent';
+import { getICHost } from './canisterConfig';
 
 // OISY Signer URLs
 const OISY_SIGNER_URL_MAINNET = 'https://oisy.com/sign';
@@ -189,7 +190,8 @@ class OisySignerService {
 
       this.identity = this.authClient.getIdentity();
       this.principal = this.identity.getPrincipal();
-      this.agent = new HttpAgent({ identity: this.identity, host: 'https://icp0.io' });
+      // Use the same host as the rest of the SPA for consistent mainnet behavior
+      this.agent = new HttpAgent({ identity: this.identity, host: getICHost() });
 
       // Set connected immediately after successful II authentication
       // The signer window is for advanced transaction signing, but basic auth works without it

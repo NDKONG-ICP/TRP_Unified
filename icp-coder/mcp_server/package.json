@@ -1,0 +1,28 @@
+{
+  "name": "@q3labs/icp-coder",
+  "version": "1.0.0",
+  "description": "ICP Coder MCP Server - Motoko AI Assistant",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "start": "node dist/index.js"
+  },
+  "keywords": [
+    "mcp",
+    "motoko",
+    "icp",
+    "ai",
+    "code-generation"
+  ],
+  "author": "TRP Unified",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
+}

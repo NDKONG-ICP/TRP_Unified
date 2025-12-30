@@ -90,41 +90,47 @@
       "package": "axiom_nft",
       "type": "rust",
       "source": ["backend/axiom_nft"],
-      "args": "(record { token_id = 1 : nat64; name = \"AXIOM Genesis #1\"; description = \"The First Oracle - Wise blockchain analyst\"; owner = principal \"yyirv-5pjkg-oupac-gzja4-ljzfn-6mvon-r5w2i-6e7wm-sde75-wuses-nqe\"; personality = opt \"Wise and analytical\"; specialization = opt \"Blockchain Expert\" })"
+      "args": "(record { token_id = 1 : nat64; name = \"AXIOM Genesis #1\"; description = \"The First Oracle - Wise blockchain analyst\"; owner = principal \"aaaaa-aa\"; personality = opt \"Wise and analytical\"; specialization = opt \"Blockchain Expert\" })"
     },
     "axiom_2": {
       "candid": "backend/axiom_nft/axiom_nft.did",
       "package": "axiom_nft",
       "type": "rust",
       "source": ["backend/axiom_nft"],
-      "args": "(record { token_id = 2 : nat64; name = \"AXIOM Genesis #2\"; description = \"The Creative Mind - NFT and art specialist\"; owner = principal \"yyirv-5pjkg-oupac-gzja4-ljzfn-6mvon-r5w2i-6e7wm-sde75-wuses-nqe\"; personality = opt \"Creative and visionary\"; specialization = opt \"NFT Art Expert\" })"
+      "args": "(record { token_id = 2 : nat64; name = \"AXIOM Genesis #2\"; description = \"The Creative Mind - NFT and art specialist\"; owner = principal \"aaaaa-aa\"; personality = opt \"Creative and visionary\"; specialization = opt \"NFT Art Expert\" })"
     },
     "axiom_3": {
       "candid": "backend/axiom_nft/axiom_nft.did",
       "package": "axiom_nft",
       "type": "rust",
       "source": ["backend/axiom_nft"],
-      "args": "(record { token_id = 3 : nat64; name = \"AXIOM Genesis #3\"; description = \"The DeFi Sage - Finance and trading guru\"; owner = principal \"yyirv-5pjkg-oupac-gzja4-ljzfn-6mvon-r5w2i-6e7wm-sde75-wuses-nqe\"; personality = opt \"Calculated and precise\"; specialization = opt \"DeFi Strategist\" })"
+      "args": "(record { token_id = 3 : nat64; name = \"AXIOM Genesis #3\"; description = \"The DeFi Sage - Finance and trading guru\"; owner = principal \"aaaaa-aa\"; personality = opt \"Calculated and precise\"; specialization = opt \"DeFi Strategist\" })"
     },
     "axiom_4": {
       "candid": "backend/axiom_nft/axiom_nft.did",
       "package": "axiom_nft",
       "type": "rust",
       "source": ["backend/axiom_nft"],
-      "args": "(record { token_id = 4 : nat64; name = \"AXIOM Genesis #4\"; description = \"The Tech Architect - Smart contract specialist\"; owner = principal \"yyirv-5pjkg-oupac-gzja4-ljzfn-6mvon-r5w2i-6e7wm-sde75-wuses-nqe\"; personality = opt \"Technical and thorough\"; specialization = opt \"Smart Contract Developer\" })"
+      "args": "(record { token_id = 4 : nat64; name = \"AXIOM Genesis #4\"; description = \"The Tech Architect - Smart contract specialist\"; owner = principal \"aaaaa-aa\"; personality = opt \"Technical and thorough\"; specialization = opt \"Smart Contract Developer\" })"
     },
     "axiom_5": {
       "candid": "backend/axiom_nft/axiom_nft.did",
       "package": "axiom_nft",
       "type": "rust",
       "source": ["backend/axiom_nft"],
-      "args": "(record { token_id = 5 : nat64; name = \"AXIOM Genesis #5\"; description = \"The Community Builder - Engagement specialist\"; owner = principal \"yyirv-5pjkg-oupac-gzja4-ljzfn-6mvon-r5w2i-6e7wm-sde75-wuses-nqe\"; personality = opt \"Friendly and engaging\"; specialization = opt \"Community Manager\" })"
+      "args": "(record { token_id = 5 : nat64; name = \"AXIOM Genesis #5\"; description = \"The Community Builder - Engagement specialist\"; owner = principal \"aaaaa-aa\"; personality = opt \"Friendly and engaging\"; specialization = opt \"Community Manager\" })"
     },
     "staking": {
       "candid": "backend/staking/staking.did",
       "package": "staking",
       "type": "rust",
       "source": ["backend/staking"]
+    },
+    "icspicy": {
+      "candid": "backend/icspicy/icspicy.did",
+      "package": "icspicy",
+      "type": "rust",
+      "source": ["backend/icspicy"]
     },
     "siwe_canister": {
       "candid": "backend/siwe_canister/siwe_canister.did",

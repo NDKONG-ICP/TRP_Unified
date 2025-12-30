@@ -9,6 +9,7 @@ members = [
     "backend/ai_engine",
     "backend/raven_ai",
     "backend/axiom_nft",
+    "backend/icspicy",
     "backend/deepseek_model",
     "backend/vector_db",
     "backend/queen_bee",
@@ -36,6 +37,11 @@ base64 = "0.21"
 anyhow = "1.0"
 thiserror = "1.0"
 getrandom = { version = "0.2", features = ["js"] }
+k256 = { version = "0.13", features = ["ecdsa", "sha256"] }
+ed25519-dalek = { version = "2.1", features = ["rand_core"] }
+signature = "2.1"
+siwe = "0.6"
+libsecp256k1 = "0.7"
 
 # ic-cdk-macros is part of ic-cdk in 0.13, not separate
 

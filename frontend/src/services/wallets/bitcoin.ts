@@ -126,8 +126,6 @@ export async function signMessage(message: string): Promise<string> {
  * Get BTC balance
  */
 export async function getBTCBalance(address: string): Promise<number> {
-  // Query Bitcoin network via RPC or API
-  // This is a placeholder - in production, use Bitcoin RPC or API
   try {
     const response = await fetch(`https://blockstream.info/api/address/${address}`);
     const data = await response.json();

@@ -45,7 +45,9 @@ service : {
     infer: (InferenceRequest) -> (variant { Ok: InferenceResponse; Err: text });
     infer_with_shards: (InferenceRequest, vec nat32) -> (variant { Ok: InferenceResponse; Err: text });
     
+    // Admin config
+    admin_set_hf_config: (opt text, opt text) -> (variant { Ok; Err: text });
+
     // Health & Status
     get_status: () -> (bool, nat64, nat32) query; // (ready, cycles_available, shards_loaded)
 }
-

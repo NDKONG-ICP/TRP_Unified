@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Suspense, lazy, useEffect, useState } from 'react';
 import { AnimatePresence } from 'framer-motion';
 import Header from './components/shared/Header';
@@ -7,14 +7,16 @@ import { ErrorBoundary } from './components/shared/ErrorBoundary';
 import LoadingScreen from './components/shared/LoadingScreen';
 import Onboarding from './components/Onboarding';
 import RavenAIChatbot from './components/RavenAIChatbot';
+import { IdentityKitBridge } from './components/IdentityKitBridge';
+import { DemoModeProvider } from './components/DemoMode';
 import { LanguageProvider } from './contexts/LanguageContext';
 import { useAuthStore } from './stores/authStore';
 import { useWalletStore } from './stores/walletStore';
 import { verifyPlugConnection, isPlugAvailable } from './services/plugService';
+import AuthGuard from './components/auth/AuthGuard';
 
 // NFID IdentityKit styles for wallet UI
 // Reference: https://github.com/internet-identity-labs/identitykit
-// Note: IdentityKitProvider disabled due to auto-open dialog issue
 import "@nfid/identitykit/react/styles.css";
 
 // Lazy load pages for better performance
@@ -92,7 +94,10 @@ function App() {
 
   return (
       <LanguageProvider>
+        <DemoModeProvider>
+        <IdentityKitBridge />
         <Router>
+          <AuthGuard />
           <div className="min-h-screen min-h-dvh bg-raven-black flex flex-col overflow-x-hidden w-full max-w-full" style={{ width: '100%', maxWidth: '100vw', overflowX: 'hidden' }}>
             <Header />
         
@@ -126,6 +131,8 @@ function App() {
                 
                 {/* Sk8 Punks Game */}
                 <Route path="/sk8-punks/*" element={<Sk8PunksPage />} />
+                <Route path="/sk8punks" element={<Navigate to="/sk8-punks" replace />} />
+                <Route path="/sk8punks/*" element={<Navigate to="/sk8-punks" replace />} />
                 
                 {/* Crossword Quest */}
                 <Route path="/crossword/*" element={<CrosswordPage />} />
@@ -133,6 +140,9 @@ function App() {
                 {/* IC SPICY RWA Co-op */}
                 <Route path="/ic-spicy/*" element={<ICSpicyPage />} />
                 <Route path="/spicy/*" element={<ICSpicyPage />} />
+                {/* Backwards-compatible aliases */}
+                <Route path="/icspicy" element={<Navigate to="/ic-spicy" replace />} />
+                <Route path="/icspicy/*" element={<Navigate to="/ic-spicy" replace />} />
                 
                 {/* User Pages */}
                 <Route path="/wallet" element={<WalletPage />} />
@@ -189,6 +199,7 @@ function App() {
             <RavenAIChatbot floating={true} />
           </div>
         </Router>
+        </DemoModeProvider>
       </LanguageProvider>
   );
 }

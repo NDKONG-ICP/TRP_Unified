@@ -1,12 +1,19 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { User, Mail, Shield, Save, Camera, Check, AlertCircle } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
+import { kipService } from '../../services/kipService';
+import { connectPhantom, signMessage as solanaSignMessage } from '../../services/wallets/solana';
+import { connectSuiWallet, signMessage as suiSignMessage } from '../../services/wallets/sui';
+import bs58 from 'bs58';
 
 export default function ProfilePage() {
-  const { isAuthenticated, login, principal, profile, setProfile } = useAuthStore();
+  const { isAuthenticated, login, principal, profile, setProfile, identity } = useAuthStore();
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [linked, setLinked] = useState<{ sol?: string[]; sui?: string[] } | null>(null);
+  const [isLinking, setIsLinking] = useState<string | null>(null);
+  const [linkError, setLinkError] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     displayName: profile?.displayName || '',
     email: profile?.email || '',
@@ -50,6 +57,120 @@ export default function ProfilePage() {
       console.error('Failed to save profile:', error);
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const loadLinked = async () => {
+    if (!identity) return;
+    await kipService.init(identity);
+    const wallets = await kipService.getMyLinkedWallets();
+    setLinked({
+      sol: wallets?.solanaPubkeys || [],
+      sui: wallets?.suiAddresses || [],
+    });
+  };
+
+  // Load linked wallets once authenticated
+  useEffect(() => {
+    if (!isAuthenticated || !identity) return;
+    loadLinked().catch((e) => console.error('Failed to load linked wallets:', e));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, identity]);
+
+  function formatSIWSMessageBackend(msg: any): string {
+    let formatted = `${msg.domain} wants you to sign in with your Solana account:\n`;
+    formatted += `${msg.address}\n\n`;
+    if (msg.statement && msg.statement.length > 0) {
+      formatted += `${msg.statement[0]}\n\n`;
+    }
+    formatted += `URI: ${msg.uri}\n`;
+    formatted += `Version: ${msg.version}\n`;
+    formatted += `Chain ID: ${msg.chain_id}\n`;
+    formatted += `Nonce: ${msg.nonce}\n`;
+    formatted += `Issued At: ${msg.issued_at}`;
+    return formatted;
+  }
+
+  function formatSISMessageBackend(msg: any): string {
+    let formatted = `${msg.domain} wants you to sign in with your Sui account:\n`;
+    formatted += `${msg.address}\n\n`;
+    if (msg.statement && msg.statement.length > 0) {
+      formatted += `${msg.statement[0]}\n\n`;
+    }
+    formatted += `URI: ${msg.uri}\n`;
+    formatted += `Version: ${msg.version}\n`;
+    formatted += `Chain ID: ${msg.chain_id}\n`;
+    formatted += `Nonce: ${msg.nonce}\n`;
+    formatted += `Issued At: ${msg.issued_at}`;
+    return formatted;
+  }
+
+  function normalizeSignatureToBase58(sig: string): string {
+    if (sig.startsWith('0x')) return sig;
+    try {
+      // already base58?
+      const bytes = bs58.decode(sig);
+      if (bytes.length === 64) return sig;
+    } catch {
+      // fallthrough
+    }
+    // assume base64 -> base58
+    const raw = atob(sig);
+    const bytes = new Uint8Array(raw.length);
+    for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+    return bs58.encode(bytes);
+  }
+
+  const handleLinkSolana = async () => {
+    if (!identity) return;
+    setIsLinking('sol');
+    setLinkError(null);
+    try {
+      await kipService.init(identity);
+      const challenge = await kipService.startLinkWallet('phantom');
+      const payload = challenge.payload;
+      const msg0 = payload?.Solana;
+      if (!msg0) throw new Error('Unexpected challenge payload for Solana');
+
+      const conn = await connectPhantom();
+      const msg = { ...msg0, address: conn.wallet.address };
+      const formatted = formatSIWSMessageBackend(msg);
+      const sigBytes = await solanaSignMessage(formatted);
+      const signature = bs58.encode(sigBytes);
+
+      await kipService.confirmLinkWallet({ Solana: msg }, signature);
+      await loadLinked();
+    } catch (e: any) {
+      setLinkError(e?.message || 'Failed to link Phantom');
+    } finally {
+      setIsLinking(null);
+    }
+  };
+
+  const handleLinkSui = async () => {
+    if (!identity) return;
+    setIsLinking('sui');
+    setLinkError(null);
+    try {
+      await kipService.init(identity);
+      const challenge = await kipService.startLinkWallet('sui');
+      const payload = challenge.payload;
+      const msg0 = payload?.Sui;
+      if (!msg0) throw new Error('Unexpected challenge payload for Sui');
+
+      const conn = await connectSuiWallet();
+      const addrOrPubkey = conn.wallet.publicKey || conn.wallet.address;
+      const msg = { ...msg0, address: addrOrPubkey };
+      const formatted = formatSISMessageBackend(msg);
+      const rawSig = await suiSignMessage(formatted);
+      const signature = normalizeSignatureToBase58(rawSig);
+
+      await kipService.confirmLinkWallet({ Sui: msg }, signature);
+      await loadLinked();
+    } catch (e: any) {
+      setLinkError(e?.message || 'Failed to link Sui');
+    } finally {
+      setIsLinking(null);
     }
   };
 
@@ -232,15 +353,50 @@ export default function ProfilePage() {
                 </div>
                 <span className="text-xs text-silver-600">Coming Soon</span>
               </div>
-              <div className="flex items-center justify-between p-3 bg-raven-dark rounded-xl opacity-50">
+              <div className="flex items-center justify-between p-3 bg-raven-dark rounded-xl">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-full bg-purple-500/20 flex items-center justify-center">
                     <span className="text-purple-400 font-bold text-xs">SOL</span>
                   </div>
                   <span className="text-silver-400 text-sm">Solana</span>
                 </div>
-                <span className="text-xs text-silver-600">Coming Soon</span>
+                {linked?.sol && linked.sol.length > 0 ? (
+                  <Check className="w-5 h-5 text-green-400" />
+                ) : (
+                  <button
+                    onClick={handleLinkSolana}
+                    disabled={isLinking === 'sol'}
+                    className="px-3 py-1 rounded-lg bg-purple-500/20 text-purple-300 text-xs hover:bg-purple-500/30 disabled:opacity-50"
+                  >
+                    {isLinking === 'sol' ? 'Linking...' : 'Link Phantom'}
+                  </button>
+                )}
               </div>
+              <div className="flex items-center justify-between p-3 bg-raven-dark rounded-xl">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-cyan-500/20 flex items-center justify-center">
+                    <span className="text-cyan-300 font-bold text-xs">SUI</span>
+                  </div>
+                  <span className="text-silver-400 text-sm">Sui</span>
+                </div>
+                {linked?.sui && linked.sui.length > 0 ? (
+                  <Check className="w-5 h-5 text-green-400" />
+                ) : (
+                  <button
+                    onClick={handleLinkSui}
+                    disabled={isLinking === 'sui'}
+                    className="px-3 py-1 rounded-lg bg-cyan-500/20 text-cyan-200 text-xs hover:bg-cyan-500/30 disabled:opacity-50"
+                  >
+                    {isLinking === 'sui' ? 'Linking...' : 'Link Sui'}
+                  </button>
+                )}
+              </div>
+
+              {linkError && (
+                <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-300 text-sm">
+                  {linkError}
+                </div>
+              )}
             </div>
           </div>
         </motion.div>

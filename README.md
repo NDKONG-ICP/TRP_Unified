@@ -1,16 +1,17 @@
-# TRP Unified - The Raven Project Unified Ecosystem
+# 🦅 The Raven Unified Ecosystem
 
 <div align="center">
 
-![Raven Logo](frontend/src/trplogo.jpg)
+![Raven Logo](frontend/public/raven-logo.png)
 
-**The Most Comprehensive Decentralized Ecosystem on Internet Computer**
+**The Most Innovative Multi-Chain AI Agent Platform on Internet Computer**
 
-[![Deployed](https://img.shields.io/badge/Status-Production%20Ready-success)](https://3kpgg-eaaaa-aaaao-a4xdq-cai.icp0.io)
-[![ICP](https://img.shields.io/badge/Built%20on-Internet%20Computer-blue)](https://internetcomputer.org)
-[![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
+[![Live Demo](https://img.shields.io/badge/Demo-Live-brightgreen)](https://3kpgg-eaaaa-aaaao-a4xdq-cai.icp0.io/)
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![IC](https://img.shields.io/badge/Built%20on-Internet%20Computer-purple)](https://internetcomputer.org/)
+[![Chain Fusion](https://img.shields.io/badge/Chain%20Fusion-Enabled-orange)](https://internetcomputer.org/chainfusion)
 
-[Live Platform](https://3kpgg-eaaaa-aaaao-a4xdq-cai.icp0.io) • [Documentation](#documentation) • [Features](#features) • [Deployment](#deployment)
+[Live App](https://3kpgg-eaaaa-aaaao-a4xdq-cai.icp0.io/) • [Pitch Deck](https://3kpgg-eaaaa-aaaao-a4xdq-cai.icp0.io/pitch) • [Tokenomics](https://3kpgg-eaaaa-aaaao-a4xdq-cai.icp0.io/tokenomics) • [Documentation](./docs/)
 
 </div>
 
@@ -18,451 +19,400 @@
 
 ## 🌟 Overview
 
-**TRP Unified** (The Raven Project Unified Ecosystem) is a production-ready, unified Web3 ecosystem built entirely on the Internet Computer Protocol (ICP). It seamlessly integrates multiple decentralized applications, AI-powered services, gaming platforms, and real-world asset tokenization into a single, cohesive experience.
+The Raven Ecosystem is a **unified multi-chain dApp platform** that combines AI agents, NFTs, DeFi, logistics, gaming, and real-world assets into a seamless Web3 experience. Built on the Internet Computer Protocol (ICP) with Chain Fusion technology, Raven enables true multi-chain interoperability while maintaining the security and decentralization of on-chain execution.
 
-### Key Highlights
+### 🎯 Vision
 
-- ✅ **Fully Deployed** - All components live on mainnet
-- ✅ **Zero Gas Fees** - Transactions cost fractions of a cent
-- ✅ **On-Chain AI** - First platform with native LLM inference
-- ✅ **Multi-Chain** - True cross-chain NFT support via Chain Fusion
-- ✅ **Production Ready** - Real users, real transactions, real value
-- ✅ **24 Canisters** - Comprehensive backend infrastructure
-- ✅ **Modern Stack** - React 18, TypeScript, Rust, Tailwind CSS
-
----
-
-## 🎯 Platform Components
-
-### 🔨 The Forge - Multi-Chain NFT Platform
-Advanced NFT minting and management with:
-- Multi-chain deployment (ICP, Ethereum, Solana, Bitcoin)
-- Full standards compliance (ICRC-7, EXT, ERC-721, ERC-1155)
-- Generative art engine with rarity scoring
-- QR code claiming system
-- Real-world asset integration
-
-### 🚚 eXpresso Logistics - Decentralized Freight Platform
-AI-powered logistics management featuring:
-- Load posting and bidding marketplace
-- KIP-verified driver system
-- NFT-based payment escrow
-- Real-time shipment tracking
-- AI route optimization
-- ASE service manuals
-
-### 📰 Raven News - Automated Content Platform
-Decentralized news generation with:
-- AI-generated SEO-optimized articles
-- Three distinct AI personas (Raven, Harlee, Macho)
-- Automated daily publishing
-- Community engagement (comments, likes, shares)
-- HARLEE token rewards
-- HALO Academic Writing Assistant
-
-### 🛹 Raven Sk8 Punks - Play-to-Earn Gaming
-2D skateboarding game with:
-- NFT staking for rewards
-- On-chain score persistence
-- Competitive leaderboards
-- EXT standard NFT collection
-
-### 🧩 Crossword Quest - AI Gaming
-Daily AI-generated puzzles with:
-- Backend AI puzzle generation
-- HARLEE token rewards
-- Progressive difficulty
-- Achievement system
-
-### 🤖 AXIOM AI Agents - Personalized AI NFTs
-Revolutionary AI agent NFTs featuring:
-- 5 genesis agents with unique personalities
-- Document upload for custom knowledge bases
-- Persistent memory systems
-- Knowledge graph storage
-- Multi-chain contract addresses
-
-### 🌶️ IC SPICY RWA Co-op
-Real-world asset tokenization:
-- Tokenized pepper farming co-op
-- Real-time farm statistics
-- SpicyAI farming assistant
-- E-commerce integration
-- Florida registered nursery
+*To create the most comprehensive and user-friendly Web3 ecosystem where AI agents, digital assets, and real-world value converge.*
 
 ---
 
 ## 🏗️ Architecture
 
-### Backend (Rust Canisters)
-
-The platform consists of **24 production canisters** on Internet Computer mainnet:
-
-#### Core Infrastructure
-- **core** - User management, authentication, profiles
-- **nft** - ICRC-7/ICRC-37 NFT standard implementation
-- **kip** - Know-Your-Identity Provider (KYC/verification)
-- **treasury** - Platform fee collection and distribution
-- **escrow** - NFT-based payment escrow system
-- **staking** - NFT staking and reward distribution
-
-#### Logistics Platform
-- **logistics** - Load management, tracking, marketplace
-
-#### AI Infrastructure
-- **ai_engine** - LLM orchestration, AI Council decision-making
-- **raven_ai** - News generation, AXIOM agent management
-- **deepseek_model** - On-chain LLM inference (DeepSeek R1)
-- **vector_db** - Semantic search, embeddings storage
-- **queen_bee** - AI pipeline orchestrator
-
-#### Multi-Chain Support
-- **siwe_canister** - Sign-In with Ethereum integration
-- **siws_canister** - Sign-In with Solana integration
-- **siwb_canister** - Sign-In with Bitcoin integration
-- **sis_canister** - Sign-In with Sui integration
-- **ordinals_canister** - Bitcoin Ordinals support
-
-#### AXIOM Agents
-- **axiom_nft** - Base AXIOM NFT canister
-- **axiom_1** through **axiom_5** - Individual genesis agents
-
-#### Frontend
-- **assets** - Frontend hosting and static assets
-
-### Frontend (React + TypeScript)
-
-- **Framework**: React 18 with TypeScript
-- **Styling**: Tailwind CSS with custom design system
-- **State**: Zustand for state management
-- **Animation**: Framer Motion
-- **i18n**: Multi-language support (10+ languages)
-- **Wallets**: Internet Identity, Plug, OISY, NFID
-- **Routing**: React Router v6
-- **Build**: Vite for fast development and optimized builds
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    RAVEN UNIFIED ECOSYSTEM                       │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │
+│  │  RavenAI    │  │  Queen Bee  │  │  DeepSeek   │              │
+│  │  Council    │◄─┤ Orchestrator│◄─┤  Shards     │              │
+│  │  (7 LLMs)   │  │             │  │  (On-chain) │              │
+│  └─────────────┘  └─────────────┘  └─────────────┘              │
+│         │                │                │                      │
+│         └────────────────┼────────────────┘                      │
+│                          ▼                                       │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │                    CORE SERVICES                         │    │
+│  ├──────────┬──────────┬──────────┬──────────┬─────────────┤    │
+│  │   KIP    │ Treasury │  Escrow  │ Staking  │  Vector DB  │    │
+│  │(Identity)│ (Tokens) │(Payments)│ (Rewards)│  (Memory)   │    │
+│  └──────────┴──────────┴──────────┴──────────┴─────────────┘    │
+│                          │                                       │
+│         ┌────────────────┼────────────────┐                      │
+│         ▼                ▼                ▼                      │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │                    APPLICATIONS                          │    │
+│  ├────────┬────────┬────────┬────────┬────────┬───────────┤    │
+│  │ Raven  │  HALO  │ IC     │Expresso│  Sk8   │ Crossword │    │
+│  │ News   │Writing │ SPICY  │Logistic│ Punks  │   Quest   │    │
+│  ├────────┼────────┼────────┼────────┼────────┼───────────┤    │
+│  │   AI   │Academic│  RWA   │ Supply │ Gaming │ Education │    │
+│  │Content │ Papers │  NFTs  │ Chain  │Staking │  Puzzles  │    │
+│  └────────┴────────┴────────┴────────┴────────┴───────────┘    │
+│                                                                  │
+│  ┌─────────────────────────────────────────────────────────┐    │
+│  │                    AXIOM GENESIS                         │    │
+│  │           Personal AI Agent NFTs (1-5)                   │    │
+│  │     Each with dedicated canister & memory storage        │    │
+│  └─────────────────────────────────────────────────────────┘    │
+│                                                                  │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                    CHAIN FUSION LAYER                            │
+├──────────┬──────────┬──────────┬──────────┬─────────────────────┤
+│   ICP    │   ETH    │   BTC    │   SOL    │       SUI           │
+│ Native   │ ckETH    │ ckBTC    │ ckSOL    │     SIWS            │
+└──────────┴──────────┴──────────┴──────────┴─────────────────────┘
+```
 
 ---
 
-## 🚀 Quick Start
+## 🚀 Products
+
+### 1. 🤖 RavenAI Council
+**Multi-Model AI Consensus System**
+
+RavenAI queries 7 different LLMs in parallel and synthesizes their responses into a single, high-confidence answer:
+
+- **Gemma 2B** - Fast responses
+- **GLM-4** - Multilingual support
+- **Mistral 7B** - General reasoning
+- **Qwen 2.5** - Multilingual
+- **Llama 3.1** - Complex tasks
+- **DeepSeek R1** - On-chain inference
+- **Mixtral MoE** - Expert routing
+
+**Features:**
+- ✅ Real-time voice synthesis (ElevenLabs)
+- ✅ Conversation memory
+- ✅ Knowledge graph
+- ✅ Accessibility modes
+
+---
+
+### 2. 📰 Raven News
+**AI-Generated Decentralized News**
+
+Autonomous news generation powered by AI and Perplexity for real-time information:
+
+- **Three AI Personas**: Raven (analytical), Harlee (friendly), Macho (bold)
+- **SEO Optimization**: Automatic meta tags and keywords
+- **HARLEE Rewards**: Earn tokens for engagement
+- **Comments & Tips**: Social interaction layer
+
+---
+
+### 3. 📚 HALO Academic Writing Assistant
+**AI-Powered Academic Document Processing**
+
+Transform your academic writing with:
+
+- **Citation Formats**: MLA, APA, Chicago, Harvard, IEEE
+- **Plagiarism Detection**: Real-time similarity checking
+- **Grammar Suggestions**: AI-powered corrections
+- **Academic Rewriting**: Enhance clarity and flow
+
+---
+
+### 4. 🌶️ IC SPICY RWA Co-op
+**Real-World Asset NFT Collection**
+
+Tokenized pepper farm co-op with:
+
+- **Multi-Layered NFT Generation**: On-chain image compositing
+- **RWA Backing**: Real agricultural assets
+- **Community Governance**: Token holder voting
+- **Revenue Sharing**: Farm yield distribution
+
+---
+
+### 5. 🚚 eXpresso Logistics
+**AI-Powered Freight Matching Platform**
+
+Revolutionary logistics platform with:
+
+- **Load Board**: Post and bid on shipments
+- **ASE Service Manual Assistant**: Explosive diagrams + AI Q&A
+- **Real-Time Tracking**: GPS integration
+- **Escrow Payments**: Secure multi-token payments
+
+---
+
+### 6. 🛹 Sk8 Punks
+**NFT Gaming & Staking**
+
+Skate-themed NFT collection with:
+
+- **Staking Rewards**: 100 HARLEE/week per staked NFT
+- **Rarity Multipliers**: Common 1x, Rare 1.5x, Epic 2x, Legendary 3x
+- **Leaderboards**: Compete for top rewards
+- **Mini-Games**: Endless runner, trick challenges
+
+---
+
+### 7. 🧩 Raven's Crossword Quest
+**AI-Generated Educational Puzzles**
+
+Learn about Web3 while having fun:
+
+- **AI-Generated Puzzles**: Fresh content daily
+- **Difficulty Levels**: Easy, Medium, Hard
+- **HARLEE Rewards**: 1 token per solved puzzle
+- **XP System**: Track your progress
+
+---
+
+### 8. 🧠 AXIOM Genesis
+**Personal AI Agent NFTs**
+
+The ultimate AI companion NFTs:
+
+- **Dedicated Canisters**: Each AXIOM has its own canister
+- **Personal Memory**: Remember conversations forever
+- **Knowledge Graph**: Build understanding over time
+- **Inter-Agent Communication**: AXIOMs can learn from each other
+
+**Genesis Collection**: Only 5 exist
+1. The First Oracle - Blockchain Analyst
+2. The Creative Mind - NFT Art Specialist
+3. The DeFi Sage - Trading Expert
+4. The Tech Architect - Smart Contract Developer
+5. The Community Builder - Engagement Specialist
+
+---
+
+## 💰 Tokenomics
+
+### $HARLEE Token
+
+| Property | Value |
+|----------|-------|
+| **Standard** | ICRC-1 |
+| **Total Supply** | 100,000,000 HARLEE |
+| **Decimals** | 8 |
+| **Ledger Canister** | `tlm4l-kaaaa-aaaah-qqeha-cai` |
+| **Index Canister** | `5ipsq-2iaaa-aaaae-qffka-cai` |
+
+### Distribution
+
+| Allocation | Percentage | Amount |
+|------------|------------|--------|
+| Community & Rewards | 40% | 40,000,000 |
+| Development | 20% | 20,000,000 |
+| Team & Advisors | 15% | 15,000,000 |
+| Treasury | 15% | 15,000,000 |
+| Liquidity | 10% | 10,000,000 |
+
+### Earning HARLEE
+
+- 🛹 **Staking**: 100 HARLEE/week per NFT
+- 🧩 **Crossword**: 1 HARLEE per puzzle
+- 📰 **News**: Tips and engagement rewards
+- 🎮 **Gaming**: Tournament prizes
+- 🤖 **AI**: Quality contributions
+
+---
+
+## 🔗 Chain Fusion
+
+Raven leverages ICP's Chain Fusion technology for true multi-chain interoperability:
+
+### Supported Chains
+
+| Chain | Integration | Features |
+|-------|-------------|----------|
+| **ICP** | Native | Full canister support |
+| **Ethereum** | ckETH + SIWE | NFT bridging, DeFi |
+| **Bitcoin** | ckBTC + SIWB | Ordinals, payments |
+| **Solana** | ckSOL + SIWS | NFT minting |
+| **Sui** | SIS | Wallet linking |
+
+### Multi-Chain Wallet Linking
+
+Users can link multiple blockchain wallets to a single IC principal:
+
+```typescript
+// Link Solana wallet
+await kipService.startLinkWallet('solana');
+const signature = await wallet.signMessage(challenge);
+await kipService.confirmLinkWallet('solana', pubkey, signature);
+```
+
+---
+
+## 🛠️ Technology Stack
+
+### Backend (Rust Canisters)
+
+| Canister | Purpose | Mainnet ID |
+|----------|---------|------------|
+| `raven_ai` | AI Council & Voice | `3noas-jyaaa-aaaao-a4xda-cai` |
+| `queen_bee` | AI Orchestration | `k6lqw-bqaaa-aaaao-a4yhq-cai` |
+| `kip` | Identity & Profiles | `3yjr7-iqaaa-aaaao-a4xaq-cai` |
+| `treasury` | Token Management | `3rk2d-6yaaa-aaaao-a4xba-cai` |
+| `staking` | NFT Staking | `inutw-jiaaa-aaaao-a4yja-cai` |
+| `logistics` | Freight Platform | `3dmn2-siaaa-aaaao-a4xca-cai` |
+| `icspicy` | RWA NFTs | `vmcfj-haaaa-aaaao-a4o3q-cai` |
+| `assets` | Frontend Hosting | `3kpgg-eaaaa-aaaao-a4xdq-cai` |
+
+### Frontend (React + TypeScript)
+
+- **Framework**: React 18 with Vite
+- **State Management**: Zustand
+- **Styling**: Tailwind CSS
+- **Animations**: Framer Motion
+- **Auth**: IdentityKit + Custom hooks
+
+### AI Services
+
+- **HuggingFace**: Model inference
+- **Perplexity**: Real-time search
+- **ElevenLabs**: Voice synthesis
+- **On-Chain DeepSeek**: Sharded model inference
+
+---
+
+## 📦 Installation
 
 ### Prerequisites
 
-- **Node.js** 18+ ([Download](https://nodejs.org/))
-- **Rust** 1.70+ ([Install](https://www.rust-lang.org/tools/install))
-- **DFX** 0.29+ ([Install](https://internetcomputer.org/docs/current/developer-docs/setup/install/))
-- **wasm32-unknown-unknown** target: `rustup target add wasm32-unknown-unknown`
+- Node.js 18+
+- Rust 1.70+
+- DFX 0.29+
+- PNPM (recommended)
 
-### Installation
+### Clone & Install
 
 ```bash
-# Clone the repository
-git clone https://github.com/YOUR_USERNAME/TRP_Unified.git
-cd TRP_Unified
+git clone https://github.com/your-org/raven-unified-ecosystem.git
+cd raven-unified-ecosystem
 
 # Install frontend dependencies
-cd frontend
-npm install
-cd ..
+cd frontend && npm install && cd ..
 
-# Rust dependencies are managed by Cargo automatically
+# Install Rust dependencies
+cargo build
 ```
 
 ### Local Development
 
 ```bash
-# Start local Internet Computer replica
+# Start local replica
 dfx start --background
 
-# Deploy all canisters locally
+# Deploy canisters
 dfx deploy
 
-# Build and serve frontend
-cd frontend
-npm run dev
-
-# Access frontend at http://localhost:5173
-# Or access via canister: http://[assets-canister-id].localhost:4943
+# Start frontend dev server
+cd frontend && npm run dev
 ```
 
 ### Mainnet Deployment
 
 ```bash
-# Set network to mainnet
-export DFX_NETWORK=ic
-
-# Ensure you have cycles in your wallet
-dfx wallet balance
+# Set safe environment variables
+export CLICOLOR=0 NO_COLOR=1 DFX_TELEMETRY_DISABLED=1
 
 # Deploy to mainnet
 dfx deploy --network ic
-
-# Or use deployment scripts
-./scripts/deploy_mainnet.sh
 ```
-
----
-
-## 📚 Documentation
-
-### Core Documentation
-
-- [Project Description](PROJECT_DESCRIPTION.md) - Comprehensive platform overview
-- [Pitch Deck](PITCH_DECK.md) - Investor and partner presentation
-- [Whitepaper](docs/WHITEPAPER.md) - Technical deep dive
-
-### Component Documentation
-
-- [AI Architecture](DEEPSEEK_R1_ARCHITECTURE.md) - On-chain AI implementation
-- [Deployment Guide](DEPLOYMENT_COMPLETE.md) - Mainnet deployment instructions
-- [API Reference](docs/API.md) - Canister interface documentation
-- [Multi-Chain Implementation](MULTI_CHAIN_IMPLEMENTATION_PLAN.md) - Cross-chain architecture
-
-### Deployment & Operations
-
-- [Deployment Status](DEPLOYMENT_COMPLETE.md) - Current deployment state
-- [Health Checks](HEALTH_CHECK_REPORT.md) - System monitoring
-- [Troubleshooting](RAVEN_AI_RESET_SOLUTION.md) - Common issues and solutions
 
 ---
 
 ## 🔐 Security
 
-### Security Features
-
-- **Internet Identity** - Passwordless authentication via WebAuthn
-- **Rate Limiting** - Protection against abuse and DDoS
-- **Input Validation** - Comprehensive validation on all endpoints
-- **Role-Based Access** - Admin, User, Driver, Shipper, Warehouse roles
-- **KYC Verification** - Document verification for drivers via KIP
-- **Escrow Protection** - Secure payment handling with NFT-based escrow
-- **Stable Memory** - All canisters use stable memory for data persistence
+### Audits
+- Smart contract audits: [Pending]
+- Penetration testing: [Pending]
 
 ### Best Practices
-
-- All canisters use stable memory for data persistence
-- Comprehensive error handling and logging
-- Input sanitization on all user inputs
-- Rate limiting on sensitive endpoints
-- Admin-only functions properly protected
-- Regular security audits and updates
+- ✅ Input validation on all canister methods
+- ✅ Principal-based access control
+- ✅ Rate limiting on sensitive operations
+- ✅ Secure HTTP outcalls with transform functions
 
 ---
 
-## 🎨 Design System
+## 🗺️ Roadmap
 
-### Theme
+### Q1 2025
+- [x] Core ecosystem deployment
+- [x] AI Council integration
+- [ ] Voice synthesis activation
+- [ ] Staking rewards launch
 
-- **Primary Colors**: Black (#000000), Gold (#FFD700), Silver (#C0C0C0)
-- **Typography**: 
-  - Playfair Display (headings)
-  - Inter (body text)
-  - JetBrains Mono (code)
-- **Effects**: Glassmorphism, gold gradients, animated particles
-- **Responsive**: Mobile-first design, works on all screen sizes
+### Q2 2025
+- [ ] AXIOM Genesis mint
+- [ ] DeepSeek sharding complete
+- [ ] Mobile app release
+- [ ] DAO governance launch
 
-### UI Components
+### Q3 2025
+- [ ] Cross-chain NFT bridging
+- [ ] Institutional partnerships
+- [ ] Layer 2 scaling solutions
 
-- Glassmorphic cards and modals
-- Animated transitions with Framer Motion
-- Loading states and error handling
-- Responsive navigation with mobile menu
-- Multi-language support with i18next
-- Dark mode support
-
----
-
-## 📊 Canister IDs (Mainnet)
-
-| Canister | ID | Purpose |
-|----------|-----|---------|
-| Assets | `3kpgg-eaaaa-aaaao-a4xdq-cai` | Frontend hosting |
-| Core | `qb6fv-6aaaa-aaaao-a4w7q-cai` | User management |
-| NFT | `37ixl-fiaaa-aaaao-a4xaa-cai` | NFT standard |
-| KIP | `3yjr7-iqaaa-aaaao-a4xaq-cai` | Identity provider |
-| Treasury | `3rk2d-6yaaa-aaaao-a4xba-cai` | Fee collection |
-| Escrow | `3wl4x-taaaa-aaaao-a4xbq-cai` | Payment escrow |
-| Logistics | `3dmn2-siaaa-aaaao-a4xca-cai` | Freight management |
-| AI Engine | `3enlo-7qaaa-aaaao-a4xcq-cai` | LLM orchestration |
-| Raven AI | `3noas-jyaaa-aaaao-a4xda-cai` | News & AXIOM |
-| DeepSeek Model | `kqj56-2aaaa-aaaao-a4ygq-cai` | On-chain LLM |
-| Vector DB | `kzkwc-miaaa-aaaao-a4yha-cai` | Semantic search |
-| Queen Bee | `k6lqw-bqaaa-aaaao-a4yhq-cai` | AI orchestrator |
-| Staking | `inutw-jiaaa-aaaao-a4yja-cai` | NFT staking |
-| AXIOM NFT | `arx4x-cqaaa-aaaao-a4z5q-cai` | AXIOM base |
-| AXIOM 1-5 | `46odg-5iaaa...` | Individual agents |
-| SIWE | `ehdei-liaaa-aaaao-a4zfa-cai` | Ethereum auth |
-| SIWS | `eacc4-gqaaa-aaaao-a4zfq-cai` | Solana auth |
-| SIWB | `evftr-hyaaa-aaaao-a4zga-cai` | Bitcoin auth |
-| SIS | `e3h6z-4iaaa-aaaao-a4zha-cai` | Sui auth |
-| Ordinals | `gb3wf-cyaaa-aaaao-a4zia-cai` | Bitcoin Ordinals |
-
----
-
-## 🛠️ Development
-
-### Project Structure
-
-```
-TRP_Unified/
-├── backend/              # Rust canisters
-│   ├── core/            # User management
-│   ├── nft/             # NFT standard
-│   ├── kip/             # Identity provider
-│   ├── treasury/        # Fee collection
-│   ├── escrow/          # Payment escrow
-│   ├── logistics/       # Freight platform
-│   ├── ai_engine/       # LLM orchestration
-│   ├── raven_ai/        # News generation
-│   ├── deepseek_model/  # On-chain LLM
-│   ├── vector_db/       # Semantic search
-│   ├── queen_bee/       # AI orchestrator
-│   ├── staking/         # NFT staking
-│   ├── axiom_nft/       # AXIOM agents
-│   └── [multi-chain]/   # Cross-chain support
-├── frontend/             # React application
-│   ├── src/
-│   │   ├── components/  # React components
-│   │   ├── pages/       # Page components
-│   │   ├── services/    # API services
-│   │   ├── stores/      # State management
-│   │   └── styles/      # Styling
-│   └── public/          # Static assets
-├── scripts/             # Deployment scripts
-├── docs/                # Documentation
-└── dfx.json             # DFX configuration
-```
-
-### Building
-
-```bash
-# Build all canisters
-dfx build
-
-# Build specific canister
-dfx build <canister_name>
-
-# Build frontend
-cd frontend
-npm run build
-
-# Full build (canisters + frontend)
-dfx build && cd frontend && npm run build
-```
-
-### Testing
-
-```bash
-# Run Rust tests
-cargo test
-
-# Run frontend tests
-cd frontend
-npm test
-
-# Type checking
-cd frontend
-npm run type-check
-```
-
-### Code Quality
-
-```bash
-# Lint frontend
-cd frontend
-npm run lint
-
-# Format Rust code
-cargo fmt
-
-# Check Rust code
-cargo clippy
-```
-
----
-
-## 🔗 Links
-
-- **Live Platform**: https://3kpgg-eaaaa-aaaao-a4xdq-cai.icp0.io
-- **GitHub**: https://github.com/YOUR_USERNAME/TRP_Unified
-- **Twitter**: https://x.com/icspicyrwa
-- **OpenChat**: https://oc.app/community/tc7su-iqaaa-aaaaf-bifhq-cai
-- **Internet Computer**: https://internetcomputer.org
+### Q4 2025
+- [ ] Full decentralization
+- [ ] Community governance
+- [ ] Global expansion
 
 ---
 
 ## 🤝 Contributing
 
-We welcome contributions! Please follow these steps:
+We welcome contributions! Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
+
+### Development Workflow
 
 1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+2. Create a feature branch
 3. Make your changes
-4. Commit with clear messages (`git commit -m 'Add amazing feature'`)
-5. Push to your branch (`git push origin feature/amazing-feature`)
-6. Open a Pull Request
-
-### Contribution Guidelines
-
-- Follow the existing code style
-- Write tests for new features
-- Update documentation as needed
-- Ensure all tests pass before submitting
+4. Run tests: `cargo test && npm run test`
+5. Submit a pull request
 
 ---
 
 ## 📄 License
 
-MIT License - see [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
 ---
 
-## 👤 Admin
+## 🔗 Links
 
-**Principal**: `lgd5r-y4x7q-lbrfa-mabgw-xurgu-4h3at-sw4sl-yyr3k-5kwgt-vlkao-jae`
-
----
-
-## 🙏 Acknowledgments
-
-- DFINITY Foundation for Internet Computer Protocol
-- DeepSeek AI for on-chain LLM capabilities
-- Community contributors and testers
-- Open-source libraries and tools
-- All early adopters and supporters
+- **Website**: [3kpgg-eaaaa-aaaao-a4xdq-cai.icp0.io](https://3kpgg-eaaaa-aaaao-a4xdq-cai.icp0.io/)
+- **Twitter**: [@RavenEcosystem](https://twitter.com/RavenEcosystem)
+- **Discord**: [Join Community](https://discord.gg/raven)
+- **OpenChat**: [Raven Group](https://oc.app)
+- **GitHub**: [raven-ecosystem](https://github.com/your-org/raven-ecosystem)
 
 ---
 
-## 📈 Roadmap
+## 📞 Contact
 
-### Completed ✅
-- [x] Core infrastructure deployment
-- [x] Multi-chain NFT support
-- [x] AI-powered news generation
-- [x] Logistics platform
-- [x] On-chain LLM integration
-- [x] AXIOM AI agents
-- [x] Multi-chain authentication
-
-### In Progress 🚧
-- [ ] Enhanced AI capabilities
-- [ ] Additional blockchain integrations
-- [ ] Mobile app development
-- [ ] Advanced analytics dashboard
-
-### Planned 📋
-- [ ] DAO governance
-- [ ] Token launch
-- [ ] Additional gaming platforms
-- [ ] Expanded RWA tokenization
+- **Email**: team@ravenecosystem.io
+- **Support**: support@ravenecosystem.io
 
 ---
 
 <div align="center">
 
-**Built with ❤️ on Internet Computer Protocol**
+**Built with 💜 on Internet Computer**
 
-[Website](https://3kpgg-eaaaa-aaaao-a4xdq-cai.icp0.io) • [GitHub](https://github.com/YOUR_USERNAME/TRP_Unified) • [Twitter](https://x.com/icspicyrwa)
-
-**The Future of Decentralized Applications**
+*The future of Web3 is unified.*
 
 </div>

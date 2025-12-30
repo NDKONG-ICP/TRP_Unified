@@ -7,6 +7,7 @@ import { Principal } from '@dfinity/principal';
 import { getCanisterId, getICHost, isMainnet } from '../canisterConfig';
 import { connectSuiWallet, signMessage, getSuiWalletConnection, SuiConnection } from '../wallets/sui';
 import { createAuthActor } from './actorHelper';
+import bs58 from 'bs58';
 
 export interface SISMessage {
   domain: string;
@@ -31,8 +32,16 @@ export interface SISSession {
   expiresAt: bigint;
 }
 
+interface BackendSISSession {
+  session_id: string;
+  sui_address: string;
+  principal: Principal;
+  created_at: bigint;
+  expires_at: bigint;
+}
+
 export interface SISVerifyResult {
-  Ok?: SISSession;
+  Ok?: BackendSISSession;
   Err?: string;
 }
 
@@ -161,7 +170,22 @@ export async function signInWithSui(
   });
   
   const formattedMessage = formatSISMessage(message);
-  const signature = await signMessage(formattedMessage);
+  const rawSignature = await signMessage(formattedMessage);
+  
+  // Backend expects base58 or 0x hex. Sui wallets often return base64 signatures.
+  const signature = (() => {
+    if (rawSignature.startsWith('0x')) return rawSignature;
+    try {
+      const bytes = bs58.decode(rawSignature);
+      if (bytes.length === 64) return rawSignature;
+    } catch {
+      // fallthrough
+    }
+    const raw = atob(rawSignature);
+    const bytes = new Uint8Array(raw.length);
+    for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);
+    return bs58.encode(bytes);
+  })();
   
   // Use actorFactory for Plug wallet support
   const actor = await createAuthActor('sis_canister', sisIdlFactory);

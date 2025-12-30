@@ -5,8 +5,8 @@
 
 import { Actor, HttpAgent, Identity } from '@dfinity/agent';
 import { Principal } from '@dfinity/principal';
-import { AuthClient } from '@dfinity/auth-client';
 import { getICHost, isMainnet } from './canisterConfig';
+import { getActiveIdentity, getOrCreateAgent } from './session';
 // Import generated IDL factories for axiom canisters
 import { idlFactory as axiom1Idl } from '../declarations/axiom_1';
 import { idlFactory as axiom2Idl } from '../declarations/axiom_2';
@@ -52,23 +52,25 @@ export interface AxiomMetadata {
   multichainMetadata: MultichainMetadata;
 }
 
-// AXIOM Canister IDs (5 Genesis NFTs)
+import { getCanisterId } from './canisterConfig';
+
+// AXIOM Canister IDs (5 Genesis NFTs) - Get from canisterConfig
 export const AXIOM_CANISTER_IDS = [
-  'axiom_1', // Will be resolved from dfx.json or environment
-  'axiom_2',
-  'axiom_3',
-  'axiom_4',
-  'axiom_5',
+  getCanisterId('axiom_1'),
+  getCanisterId('axiom_2'),
+  getCanisterId('axiom_3'),
+  getCanisterId('axiom_4'),
+  getCanisterId('axiom_5'),
 ] as const;
 
 // Get the appropriate IDL factory based on canister ID
 function getAxiomIdlFactory(canisterId: string) {
   const idlMap: Record<string, any> = {
-    '46odg-5iaaa-aaaao-a4xqa-cai': axiom1Idl,
-    '4zpfs-qqaaa-aaaao-a4xqq-cai': axiom2Idl,
-    '4ckzx-kiaaa-aaaao-a4xsa-cai': axiom3Idl,
-    '4fl7d-hqaaa-aaaao-a4xsq-cai': axiom4Idl,
-    '4miu7-ryaaa-aaaao-a4xta-cai': axiom5Idl,
+    [getCanisterId('axiom_1')]: axiom1Idl,
+    [getCanisterId('axiom_2')]: axiom2Idl,
+    [getCanisterId('axiom_3')]: axiom3Idl,
+    [getCanisterId('axiom_4')]: axiom4Idl,
+    [getCanisterId('axiom_5')]: axiom5Idl,
   };
   return idlMap[canisterId] || axiom1Idl; // Fallback to axiom1Idl
 }
@@ -77,17 +79,8 @@ function getAxiomIdlFactory(canisterId: string) {
 
 class AxiomService {
   private async createActor(canisterId: string) {
-    const authClient = await AuthClient.create();
-    const identity = authClient.getIdentity();
-
-    const agent = new HttpAgent({
-      identity,
-      host: getICHost(),
-    });
-
-    if (!isMainnet()) {
-      await agent.fetchRootKey();
-    }
+    const identity = getActiveIdentity();
+    const agent = await getOrCreateAgent(identity);
 
     // Use the generated IDL factory for this specific canister
     const idlFactory = getAxiomIdlFactory(canisterId);

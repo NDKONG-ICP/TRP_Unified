@@ -66,7 +66,7 @@ async function createIndexerActor() {
     await agent.fetchRootKey();
   }
   
-  const canisterId = getCanisterId('ordinals_indexer_canister');
+  const canisterId = getCanisterId('ordinals_canister');
   return Actor.createActor(indexerIdlFactory, {
     agent,
     canisterId: Principal.fromText(canisterId),

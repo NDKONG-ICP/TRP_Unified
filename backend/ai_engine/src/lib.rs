@@ -102,6 +102,9 @@ pub struct AIConfig {
     pub admin: Principal,
     pub cache_duration_ns: u64,
     pub max_requests_per_minute: u32,
+    pub huggingface_api_key: String,
+    pub perplexity_api_key: String,
+    pub openai_api_key: String,
 }
 
 impl Default for AIConfig {
@@ -110,6 +113,9 @@ impl Default for AIConfig {
             admin: Principal::anonymous(),
             cache_duration_ns: 3600_000_000_000, // 1 hour
             max_requests_per_minute: 60,
+            huggingface_api_key: "".to_string(),
+            perplexity_api_key: "".to_string(),
+            openai_api_key: "".to_string(),
         }
     }
 }
@@ -181,29 +187,22 @@ thread_local! {
         RefCell::new(llm_council::LLMCouncil::new(llm_council::CouncilConfig::default()));
 }
 
-const ADMIN_PRINCIPAL: &str = "lgd5r-y4x7q-lbrfa-mabgw-xurgu-4h3at-sw4sl-yyr3k-5kwgt-vlkao-jae";
-
 fn is_admin(caller: Principal) -> bool {
     CONFIG.with(|c| c.borrow().get().admin == caller)
-        || caller.to_text() == ADMIN_PRINCIPAL
+        || ic_cdk::api::is_controller(&caller)
 }
 
 fn generate_cache_key(origin: &str, destination: &str) -> String {
     format!("{}|{}", origin.to_lowercase(), destination.to_lowercase())
 }
 
-// Initialization
 #[init]
 fn init() {
     let caller = ic_cdk::caller();
     
     CONFIG.with(|c| {
         let mut config = c.borrow().get().clone();
-        config.admin = if caller != Principal::anonymous() {
-            caller
-        } else {
-            Principal::from_text(ADMIN_PRINCIPAL).unwrap()
-        };
+        config.admin = caller;
         c.borrow_mut().set(config).unwrap();
     });
 }
@@ -222,24 +221,81 @@ async fn optimize_route(origin: String, destination: String) -> Result<RouteOpti
     let cache_key = generate_cache_key(&origin, &destination);
     let config = CONFIG.with(|c| c.borrow().get().clone());
     
-    // Check cache
+    // 1. Check cache
     let cached = ROUTE_CACHE.with(|r| r.borrow().get(&StorableString(cache_key.clone())));
-    
     if let Some(route) = cached {
         if now - route.cached_at < config.cache_duration_ns {
             return Ok(route);
         }
     }
     
-    // In production, this would make HTTPS outcalls to:
-    // - Google Maps API for routing
-    // - Weather API for conditions
-    // - Traffic API for real-time data
+    // 2. Perform real optimization via AI Council
+    let prompt = format!(
+        "Optimize a logistics route from {} to {}. Provide: \
+        1. Distance in miles\n\
+        2. Duration in hours\n\
+        3. Fuel cost estimate (at $3.50/gal, avg 6mpg)\n\
+        4. Toll cost estimate\n\
+        5. Current typical weather and traffic\n\
+        6. Recommended stops\n\n\
+        Respond ONLY in JSON format matching this structure: \
+        {{\"distance_miles\": f64, \"duration_hours\": f64, \"fuel_cost_estimate\": f64, \"toll_cost_estimate\": f64, \"weather_conditions\": string, \"traffic_level\": string, \"recommended_stops\": [string], \"alternative_routes\": [{{ \"name\": string, \"distance_miles\": f64, \"duration_hours\": f64, \"notes\": string }}]}}",
+        origin, destination
+    );
+
+    // Call Perplexity for real-time data
+    let api_key = if !config.perplexity_api_key.is_empty() { 
+        config.perplexity_api_key.clone() 
+    } else {
+        return Err("Perplexity API key not configured".to_string());
+    };
+
+    let body = serde_json::json!({
+        "model": "llama-3.1-sonar-large-128k-online",
+        "messages": [
+            {"role": "system", "content": "You are a logistics optimization expert. Provide accurate, real-time routing data in JSON format."},
+            {"role": "user", "content": prompt}
+        ],
+        "response_format": { "type": "json_object" }
+    });
+
+    use ic_cdk::api::management_canister::http_request::{
+        http_request, CanisterHttpRequestArgument, HttpHeader, HttpMethod,
+    };
+
+    let request = CanisterHttpRequestArgument {
+        url: "https://api.perplexity.ai/chat/completions".to_string(),
+        method: HttpMethod::POST,
+        body: Some(serde_json::to_vec(&body).unwrap()),
+        max_response_bytes: Some(10_000),
+        transform: None,
+        headers: vec![
+            HttpHeader { name: "Content-Type".to_string(), value: "application/json".to_string() },
+            HttpHeader { name: "Authorization".to_string(), value: format!("Bearer {}", api_key) },
+        ],
+    };
+
+    let (res,) = http_request(request, 20_000_000_000).await
+        .map_err(|(code, msg)| format!("HTTP request failed: {:?} - {}", code, msg))?;
+
+    if res.status != 200 {
+        return Err(format!("API returned error status: {}", res.status));
+    }
+
+    let api_res: serde_json::Value = serde_json::from_slice(&res.body)
+        .map_err(|e| format!("Failed to parse API response: {}", e))?;
     
-    // For now, generate simulated optimization
-    let route = generate_simulated_route(&origin, &destination, now);
+    let content = api_res["choices"][0]["message"]["content"].as_str()
+        .ok_or("No content in response")?;
     
-    // Cache result
+    let mut route: RouteOptimization = serde_json::from_str(content)
+        .map_err(|e| format!("Failed to parse route JSON: {}", e))?;
+    
+    route.origin = origin;
+    route.destination = destination;
+    route.cached_at = now;
+    
+    // 3. Cache and return
     ROUTE_CACHE.with(|r| {
         r.borrow_mut().insert(StorableString(cache_key), route.clone());
     });
@@ -295,28 +351,26 @@ pub struct ETAPrediction {
     pub factors: Vec<String>,
 }
 
-#[query]
-fn predict_eta(
+#[update]
+async fn predict_eta(
     origin: String,
     destination: String,
     current_location: Option<String>,
-) -> ETAPrediction {
-    // Simulated ETA prediction
-    let now = ic_cdk::api::time();
-    let hours = 5 + (now % 10) as u64;
+) -> Result<ETAPrediction, String> {
+    let route = optimize_route(origin.clone(), destination.clone()).await?;
     
-    ETAPrediction {
+    Ok(ETAPrediction {
         origin,
         destination,
         current_location,
-        estimated_arrival: format!("{} hours", hours),
-        confidence: 0.85,
+        estimated_arrival: format!("{:.1} hours", route.duration_hours),
+        confidence: 0.92,
         factors: vec![
-            "Current traffic conditions".to_string(),
-            "Weather forecast".to_string(),
-            "Historical data".to_string(),
+            format!("Weather: {}", route.weather_conditions),
+            format!("Traffic: {}", route.traffic_level),
+            "Historical route data".to_string(),
         ],
-    }
+    })
 }
 
 // === Fuel Optimization ===
@@ -337,24 +391,22 @@ pub struct FuelStop {
     pub distance_from_start: f64,
 }
 
-#[query]
-fn optimize_fuel(origin: String, destination: String, mpg: f64) -> FuelOptimization {
-    let distance = 300.0; // Simulated
-    let gallons_needed = distance / mpg;
+#[update]
+async fn optimize_fuel(origin: String, destination: String, mpg: f64) -> Result<FuelOptimization, String> {
+    let route = optimize_route(origin.clone(), destination.clone()).await?;
+    let gallons_needed = route.distance_miles / mpg;
     
-    FuelOptimization {
+    Ok(FuelOptimization {
         route: format!("{} to {}", origin, destination),
         total_fuel_gallons: gallons_needed,
-        estimated_cost: gallons_needed * 3.50,
-        recommended_stops: vec![
-            FuelStop {
-                location: "Truck Stop A - Mile 150".to_string(),
-                price_per_gallon: 3.45,
-                distance_from_start: 150.0,
-            },
-        ],
-        potential_savings: gallons_needed * 0.10, // ~$0.10/gallon savings
-    }
+        estimated_cost: route.fuel_cost_estimate,
+        recommended_stops: route.recommended_stops.iter().map(|s| FuelStop {
+            location: s.clone(),
+            price_per_gallon: 3.50,
+            distance_from_start: 0.0, // TBD from API
+        }).collect(),
+        potential_savings: gallons_needed * 0.15,
+    })
 }
 
 // === Cache Management ===
@@ -395,6 +447,24 @@ fn get_cached_route(origin: String, destination: String) -> Option<RouteOptimiza
 #[query]
 fn get_config() -> AIConfig {
     CONFIG.with(|c| c.borrow().get().clone())
+}
+
+#[update]
+fn admin_set_api_keys(huggingface: String, perplexity: String, openai: String) -> Result<(), String> {
+    let caller = ic_cdk::caller();
+    if !is_admin(caller) {
+        return Err("Only admin can set API keys".to_string());
+    }
+    
+    CONFIG.with(|c| {
+        let mut config = c.borrow().get().clone();
+        config.huggingface_api_key = huggingface;
+        config.perplexity_api_key = perplexity;
+        config.openai_api_key = openai;
+        c.borrow_mut().set(config).unwrap();
+    });
+    
+    Ok(())
 }
 
 #[query]

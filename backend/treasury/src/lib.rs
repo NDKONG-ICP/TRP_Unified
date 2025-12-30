@@ -4,13 +4,16 @@
 //! Reference: https://github.com/dragginzgame/icydb for data model patterns
 
 use candid::{CandidType, Decode, Encode, Nat, Principal};
+use ic_cdk::api::management_canister::ecdsa::{
+    ecdsa_public_key, sign_with_ecdsa, EcdsaCurve, EcdsaKeyId, EcdsaPublicKeyArgument,
+    SignWithEcdsaArgument,
+};
 use ic_cdk_macros::{init, post_upgrade, pre_upgrade, query, update};
 use ic_stable_structures::memory_manager::{MemoryId, MemoryManager, VirtualMemory};
 use ic_stable_structures::{DefaultMemoryImpl, StableBTreeMap, StableCell, Storable};
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::cell::RefCell;
-use std::collections::HashMap;
 
 type Memory = VirtualMemory<DefaultMemoryImpl>;
 
@@ -23,26 +26,25 @@ const MULTI_CHAIN_BALANCES_MEM_ID: MemoryId = MemoryId::new(4);
 
 // ============ ADMIN PRINCIPALS AND ADDRESSES ============
 // These are the ONLY addresses that can control treasury operations
+// Admin principals are now managed dynamically or via controllers for privacy.
 
-// Cursor/Dev Admin Principal (Internet Identity)
-const ADMIN_PRINCIPAL_CURSOR: &str = "lgd5r-y4x7q-lbrfa-mabgw-xurgu-4h3at-sw4sl-yyr3k-5kwgt-vlkao-jae";
+// ICP Account ID (Placeholder)
+const ADMIN_ICP_ACCOUNT_ID: &str = "";
 
-// Plug Wallet Admin Principal
-const ADMIN_PRINCIPAL_PLUG: &str = "sh7h6-b7xcy-tjank-crj6d-idrcr-ormbi-22yqs-uanyl-itbp3-ur5ue-wae";
+// Multi-chain addresses for NFT minting and receiving (Placeholders)
+const ADMIN_BTC_ADDRESS: &str = "";
+const ADMIN_ETH_ADDRESS: &str = "";
+const ADMIN_SOL_ADDRESS: &str = "";
 
-// OISY Wallet Principal (multi-token)
-const ADMIN_PRINCIPAL_OISY: &str = "yyirv-5pjkg-oupac-gzja4-ljzfn-6mvon-r5w2i-6e7wm-sde75-wuses-nqe";
+// Threshold ECDSA constants
+const KEY_NAME: &str = "key_1"; // Use "key_1" for mainnet, "dfx_test_key" for local
 
-// New Admin Principal
-const ADMIN_PRINCIPAL_NEW: &str = "imnyd-k37s2-xlg7c-omeed-ezrzg-6oesa-r3ek6-xrwuz-qbliq-5h675-yae";
-
-// ICP Account ID (OISY ICP-only wallet)
-const ADMIN_ICP_ACCOUNT_ID: &str = "82f47963aa786ed12c115f40027ef1e86e1a8010119afc5e8709589609bc2f8f";
-
-// Multi-chain addresses for NFT minting and receiving
-const ADMIN_BTC_ADDRESS: &str = "bc1qxf5fegu3x4uvynqz69q62jcglzg3m8jpzrsdej";
-const ADMIN_ETH_ADDRESS: &str = "0x989847D46770e2322b017c79e2fAF253aA23687f";
-const ADMIN_SOL_ADDRESS: &str = "6NgxMDwKYfqdtBVpbkA3LmCHzXS5CZ8DvQX72KpDZ5A4";
+fn get_ecdsa_key_id() -> EcdsaKeyId {
+    EcdsaKeyId {
+        curve: EcdsaCurve::Secp256k1,
+        name: KEY_NAME.to_string(),
+    }
+}
 
 // ============ TYPES ============
 
@@ -71,6 +73,16 @@ pub enum TokenType {
     ETH,
     SOL,
     SUI,
+}
+
+#[derive(CandidType, Serialize, Deserialize, Clone, Debug)]
+pub struct SwapRecord {
+    pub from_token: TokenType,
+    pub from_amount: u64,
+    pub to_token: TokenType,
+    pub to_amount: u64,
+    pub timestamp: u64,
+    pub status: String,
 }
 
 #[derive(CandidType, Serialize, Deserialize, Clone, Debug, PartialEq)]
@@ -175,7 +187,7 @@ pub struct MultiChainAddresses {
 impl Default for MultiChainAddresses {
     fn default() -> Self {
         Self {
-            icp_principal: ADMIN_PRINCIPAL_CURSOR.to_string(),
+            icp_principal: "".to_string(),
             icp_account_id: ADMIN_ICP_ACCOUNT_ID.to_string(),
             btc_address: ADMIN_BTC_ADDRESS.to_string(),
             eth_address: ADMIN_ETH_ADDRESS.to_string(),
@@ -198,12 +210,7 @@ pub struct TreasuryConfig {
 impl Default for TreasuryConfig {
     fn default() -> Self {
         Self {
-            admin_principals: vec![
-                ADMIN_PRINCIPAL_CURSOR.to_string(),
-                ADMIN_PRINCIPAL_PLUG.to_string(),
-                ADMIN_PRINCIPAL_OISY.to_string(),
-                ADMIN_PRINCIPAL_NEW.to_string(),
-            ],
+            admin_principals: vec![],
             withdrawal_threshold: 100_000_000, // 1 ICP minimum balance
             multi_sig_required: false, // Single admin approval (OISY or Plug)
             required_approvals: 1, // Only 1 admin needed
@@ -283,15 +290,11 @@ thread_local! {
 // ============ AUTHORIZATION ============
 
 fn is_admin(caller: Principal) -> bool {
-    let caller_text = caller.to_text();
-    
-    // Check against all admin principals
-    if caller_text == ADMIN_PRINCIPAL_CURSOR ||
-       caller_text == ADMIN_PRINCIPAL_PLUG ||
-       caller_text == ADMIN_PRINCIPAL_OISY ||
-       caller_text == ADMIN_PRINCIPAL_NEW {
+    if ic_cdk::api::is_controller(&caller) {
         return true;
     }
+    
+    let caller_text = caller.to_text();
     
     // Also check config for dynamically added admins
     CONFIG.with(|c| {
@@ -329,16 +332,13 @@ fn next_withdrawal_id() -> u64 {
 
 #[init]
 fn init() {
-    let caller = ic_cdk::caller();
-    
-    // Initialize with default config (includes all admin principals)
+    // Initialize with default config
     CONFIG.with(|c| {
         let config = TreasuryConfig::default();
         c.borrow_mut().set(config).unwrap();
     });
     
     ic_cdk::println!("Treasury initialized with multi-chain support");
-    ic_cdk::println!("Admin principals: Cursor/Dev, Plug, OISY");
 }
 
 #[pre_upgrade]
@@ -346,23 +346,7 @@ fn pre_upgrade() {}
 
 #[post_upgrade]
 fn post_upgrade() {
-    // Ensure config has all admin principals after upgrade
-    CONFIG.with(|c| {
-        let mut config = c.borrow().get().clone();
-        let required_admins = vec![
-            ADMIN_PRINCIPAL_CURSOR.to_string(),
-            ADMIN_PRINCIPAL_PLUG.to_string(),
-            ADMIN_PRINCIPAL_OISY.to_string(),
-            ADMIN_PRINCIPAL_NEW.to_string(),
-        ];
-        
-        for admin in required_admins {
-            if !config.admin_principals.contains(&admin) {
-                config.admin_principals.push(admin);
-            }
-        }
-        c.borrow_mut().set(config).unwrap();
-    });
+    ic_cdk::println!("Treasury upgraded");
 }
 
 // ============ DEPOSIT FUNCTIONS ============
@@ -431,7 +415,7 @@ fn deposit_harlee_rewards(amount: u64, memo: String) -> Result<u64, String> {
 
 /// Distribute HARLEE rewards to users
 #[update]
-fn distribute_harlee_reward(recipient: Principal, amount: u64, memo: String) -> Result<u64, String> {
+async fn distribute_harlee_reward(recipient: Principal, amount: u64, memo: String) -> Result<u64, String> {
     let caller = ic_cdk::caller();
     require_admin(caller)?;
     
@@ -439,41 +423,16 @@ fn distribute_harlee_reward(recipient: Principal, amount: u64, memo: String) -> 
         return Err("Amount must be greater than 0".to_string());
     }
     
-    let current_harlee = get_token_balance(&TokenType::HARLEE);
+    // Fetch latest balance from ledger to ensure accuracy
+    let current_harlee = fetch_harlee_balance().await?;
     if amount > current_harlee {
-        return Err(format!("Insufficient HARLEE balance. Available: {}, Requested: {}", current_harlee, amount));
+        return Err(format!("Insufficient HARLEE balance on ledger. Available: {}, Requested: {}", current_harlee, amount));
     }
     
-    let tx_id = next_tx_id();
-    let now = ic_cdk::api::time();
+    // Perform actual transfer via ledger
+    let block_index = transfer_harlee(recipient, amount, Some(memo)).await?;
     
-    // Deduct from balance
-    BALANCE.with(|b| {
-        let mut balance = b.borrow().get().clone();
-        balance.harlee = balance.harlee.saturating_sub(amount);
-        balance.last_updated = now;
-        b.borrow_mut().set(balance).unwrap();
-    });
-    
-    // Record transaction
-    let tx = Transaction {
-        id: tx_id,
-        tx_type: TransactionType::Reward,
-        token: TokenType::HARLEE,
-        amount,
-        from: Some("Treasury Rewards Pool".to_string()),
-        to: Some(recipient.to_text()),
-        timestamp: now,
-        memo,
-        tx_hash: None,
-        chain: "ICP".to_string(),
-    };
-    
-    TRANSACTIONS.with(|t| {
-        t.borrow_mut().insert(StorableNat(tx_id), tx);
-    });
-    
-    Ok(tx_id)
+    Ok(block_index)
 }
 
 // ============ WITHDRAWAL FUNCTIONS ============
@@ -887,14 +846,6 @@ fn remove_admin(principal_text: String) -> Result<(), String> {
     let caller = ic_cdk::caller();
     require_admin(caller)?;
     
-    // Prevent removing the core admins
-    if principal_text == ADMIN_PRINCIPAL_CURSOR ||
-       principal_text == ADMIN_PRINCIPAL_PLUG ||
-       principal_text == ADMIN_PRINCIPAL_OISY ||
-       principal_text == ADMIN_PRINCIPAL_NEW {
-        return Err("Cannot remove core admin principals".to_string());
-    }
-    
     CONFIG.with(|c| {
         let mut config = c.borrow().get().clone();
         config.admin_principals.retain(|p| p != &principal_text);
@@ -1042,6 +993,52 @@ async fn fetch_icp_balance() -> Result<u64, String> {
     }
 }
 
+/// Sync specific token balance from its ledger
+#[update]
+async fn sync_token_balance(token: TokenType) -> Result<u64, String> {
+    match token {
+        TokenType::ICP => fetch_icp_balance().await,
+        TokenType::HARLEE => fetch_harlee_balance().await,
+        TokenType::CkBTC => {
+            let ledger = Principal::from_text(CKBTC_LEDGER_ID).map_err(|e| e.to_string())?;
+            let balance = fetch_icrc1_balance(ledger).await?;
+            BALANCE.with(|b| {
+                let mut bal = b.borrow().get().clone();
+                bal.ck_btc = balance;
+                bal.last_updated = ic_cdk::api::time();
+                b.borrow_mut().set(bal).unwrap();
+            });
+            Ok(balance)
+        },
+        TokenType::CkETH => {
+            let ledger = Principal::from_text(CKETH_LEDGER_ID).map_err(|e| e.to_string())?;
+            let balance = fetch_icrc1_balance(ledger).await?;
+            BALANCE.with(|b| {
+                let mut bal = b.borrow().get().clone();
+                bal.ck_eth = balance;
+                bal.last_updated = ic_cdk::api::time();
+                b.borrow_mut().set(bal).unwrap();
+            });
+            Ok(balance)
+        },
+        _ => Err("Sync not supported for this token yet".to_string()),
+    }
+}
+
+async fn fetch_icrc1_balance(ledger: Principal) -> Result<u64, String> {
+    let account = Account {
+        owner: ic_cdk::api::id(),
+        subaccount: None,
+    };
+    
+    let result: Result<(Nat,), _> = ic_cdk::call(ledger, "icrc1_balance_of", (account,)).await;
+    
+    match result {
+        Ok((balance,)) => Ok(balance.0.try_into().unwrap_or(0u64)),
+        Err((code, msg)) => Err(format!("Failed to fetch balance: {:?} - {}", code, msg))
+    }
+}
+
 /// Fetch all token balances from their respective ledgers
 #[update]
 async fn fetch_all_balances() -> Result<TreasuryBalance, String> {
@@ -1167,6 +1164,164 @@ enum TransferError {
     Duplicate { duplicate_of: Nat },
     TemporarilyUnavailable,
     GenericError { error_code: Nat, message: String },
+}
+
+#[update]
+async fn get_canister_public_key() -> Result<Vec<u8>, String> {
+    let request = EcdsaPublicKeyArgument {
+        canister_id: None,
+        derivation_path: vec![],
+        key_id: get_ecdsa_key_id(),
+    };
+
+    let (res,) = ecdsa_public_key(request)
+        .await
+        .map_err(|(code, msg)| format!("Failed to get public key: {:?} - {}", code, msg))?;
+
+    Ok(res.public_key)
+}
+
+#[update]
+async fn sign_data(message_hash: Vec<u8>) -> Result<Vec<u8>, String> {
+    require_admin(ic_cdk::caller())?;
+
+    if message_hash.len() != 32 {
+        return Err("Message hash must be 32 bytes".to_string());
+    }
+
+    let request = SignWithEcdsaArgument {
+        message_hash,
+        derivation_path: vec![],
+        key_id: get_ecdsa_key_id(),
+    };
+
+    let (res,) = sign_with_ecdsa(request)
+        .await
+        .map_err(|(code, msg)| format!("Failed to sign data: {:?} - {}", code, msg))?;
+
+    Ok(res.signature)
+}
+
+#[update]
+async fn setup_multichain_addresses() -> Result<MultiChainAddresses, String> {
+    require_admin(ic_cdk::caller())?;
+    
+    let public_key = get_canister_public_key().await?;
+    
+    // Convert public key to addresses
+    // For ETH: Keccak256 hash of public key (last 20 bytes)
+    use sha3::{Digest as _, Keccak256};
+    let mut hasher = Keccak256::new();
+    hasher.update(&public_key[1..]); // Remove leading 0x04 for uncompressed key
+    let eth_hash = hasher.finalize();
+    let eth_address = format!("0x{}", hex::encode(&eth_hash[12..]));
+    
+    // For BTC: P2PKH or P2WPKH (simplified here)
+    use ripemd::{Digest as _, Ripemd160};
+    use sha2::{Digest as _, Sha256};
+    let sha256_hash = Sha256::digest(&public_key);
+    let ripemd160_hash = Ripemd160::digest(&sha256_hash);
+    let btc_address = format!("bc1q{}", hex::encode(&ripemd160_hash)); // Placeholder for real bech32
+    
+    let addresses = MultiChainAddresses {
+        icp_principal: ic_cdk::id().to_text(),
+        icp_account_id: ADMIN_ICP_ACCOUNT_ID.to_string(), // Keep if needed or derive
+        btc_address,
+        eth_address,
+        sol_address: ADMIN_SOL_ADDRESS.to_string(), // Solana uses Ed25519, separate key
+    };
+    
+    CONFIG.with(|c| {
+        let mut config = c.borrow().get().clone();
+        config.multi_chain_addresses = addresses.clone();
+        c.borrow_mut().set(config).unwrap();
+    });
+    
+    Ok(addresses)
+}
+
+#[update]
+async fn process_nft_payment(from_token: TokenType, amount: u64, nft_id: u64, tx_hash: Option<String>) -> Result<u64, String> {
+    // 1. Swap the payment token to ICP via internal calculation (mainnet bridge pattern)
+    let icp_received = if amount > 0 {
+        auto_swap_to_icp(from_token.clone(), amount).await?
+    } else {
+        0 // ICPay handles the actual transfer
+    };
+    
+    // 2. Record the final transaction
+    let tx_id = next_tx_id();
+    let now = ic_cdk::api::time();
+    let tx = Transaction {
+        id: tx_id,
+        tx_type: TransactionType::NFTSale,
+        token: TokenType::ICP,
+        amount: icp_received,
+        from: Some(format!("{:?}", from_token)),
+        to: Some("Treasury_Wallet".to_string()),
+        timestamp: now,
+        memo: format!("Payment for NFT #{} (Original: {} units of {:?})", nft_id, amount, from_token),
+        tx_hash,
+        chain: "ICP".to_string(),
+    };
+    
+    TRANSACTIONS.with(|t| {
+        t.borrow_mut().insert(StorableNat(tx_id), tx);
+    });
+    
+    // 3. Update the Treasury ICP balance
+    if icp_received > 0 {
+        BALANCE.with(|b| {
+            let mut balance = b.borrow().get().clone();
+            balance.icp = balance.icp.saturating_add(icp_received);
+            balance.last_updated = now;
+            b.borrow_mut().set(balance).unwrap();
+        });
+    }
+    
+    Ok(tx_id)
+}
+
+#[update]
+async fn auto_swap_to_icp(from_token: TokenType, amount: u64) -> Result<u64, String> {
+    // In a production environment, this would integrate with Sonic or ICPSwap
+    // For now, we'll calculate the ICP equivalent and record the swap
+    
+    let icp_price = 10.0; // Mock price: 1 ICP = $10
+    let token_price = match from_token {
+        TokenType::CkBTC | TokenType::BTC => 100000.0,
+        TokenType::CkETH | TokenType::ETH => 3000.0,
+        TokenType::SOL => 100.0,
+        TokenType::HARLEE => 0.1,
+        TokenType::ICP => 10.0,
+        _ => 1.0,
+    };
+    
+    let usd_value = (amount as f64) * token_price;
+    let icp_amount = (usd_value / icp_price) as u64;
+    
+    let now = ic_cdk::api::time();
+    let tx_id = next_tx_id();
+    
+    // Record the "swap" transaction
+    let tx = Transaction {
+        id: tx_id,
+        tx_type: TransactionType::Transfer,
+        token: TokenType::ICP,
+        amount: icp_amount,
+        from: Some(format!("{:?}", from_token)),
+        to: Some("Treasury".to_string()),
+        timestamp: now,
+        memo: format!("Auto-swap from {:?} to ICP", from_token),
+        tx_hash: None,
+        chain: "ICP".to_string(),
+    };
+    
+    TRANSACTIONS.with(|t| {
+        t.borrow_mut().insert(StorableNat(tx_id), tx);
+    });
+    
+    Ok(icp_amount)
 }
 
 #[query]

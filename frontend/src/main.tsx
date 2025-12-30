@@ -1,6 +1,8 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { IdentityKitProvider } from "@nfid/identitykit/react";
+import { IdentityKitAuthType } from "@nfid/identitykit";
 import App from './App';
 import './index.css';
 import './styles/newspaper.css';
@@ -54,11 +56,28 @@ const queryClient = new QueryClient({
   },
 });
 
+const identityKitConfig = {
+  signerClientOptions: {
+    targets: [
+      '3noas-jyaaa-aaaao-a4xda-cai', // raven_ai
+      'k6lqw-bqaaa-aaaao-a4yhq-cai', // queen_bee
+      '3rk2d-6yaaa-aaaao-a4xba-cai', // treasury
+      '3yjr7-iqaaa-aaaao-a4xaq-cai', // kip
+      'vmcfj-haaaa-aaaao-a4o3q-cai', // icspicy
+    ],
+  },
+};
+
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <ErrorBoundary>
       <QueryClientProvider client={queryClient}>
-        <App />
+        <IdentityKitProvider
+          signerClientOptions={identityKitConfig.signerClientOptions}
+          authType={IdentityKitAuthType.DELEGATION}
+        >
+          <App />
+        </IdentityKitProvider>
       </QueryClientProvider>
     </ErrorBoundary>
   </React.StrictMode>

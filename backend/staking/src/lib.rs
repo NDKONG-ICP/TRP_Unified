@@ -18,7 +18,7 @@ const LEADERBOARD_MEM_ID: MemoryId = MemoryId::new(1);
 const CONFIG_MEM_ID: MemoryId = MemoryId::new(2);
 
 // Constants
-const WEEKLY_HARLEE_REWARD: u64 = 100_000_000_000; // 100 $HARLEE in e8s
+const WEEKLY_HARLEE_REWARD: u64 = 10_000_000_000; // 100 $HARLEE in e8s (100 * 10^8)
 const SECONDS_PER_WEEK: u64 = 604800;
 const SK8_PUNKS_COLLECTION: &str = "b4mk6-5qaaa-aaaah-arerq-cai";
 const HARLEE_LEDGER_STR: &str = "tlm4l-kaaaa-aaaah-qqeha-cai";
@@ -282,9 +282,29 @@ async fn unstake_nft(token_id: u64, collection: String) -> Result<u64, String> {
     update_leaderboard(caller, -1, rewards);
     
     // In production, transfer $HARLEE tokens here
-    // For now, just return the amount
+    let ledger = CONFIG.with(|c| c.borrow().get().harlee_ledger).ok_or("Ledger not configured")?;
+    let _ = transfer_tokens(ledger, caller, rewards).await?;
     
     Ok(rewards)
+}
+
+async fn transfer_tokens(ledger: Principal, to: Principal, amount: u64) -> Result<u64, String> {
+    #[derive(CandidType, serde::Deserialize)]
+    struct Account { owner: Principal, subaccount: Option<Vec<u8>> }
+    #[derive(CandidType)]
+    struct TransferArg { to: Account, fee: Option<candid::Nat>, memo: Option<Vec<u8>>, from_subaccount: Option<Vec<u8>>, created_at_time: Option<u64>, amount: candid::Nat }
+    #[derive(CandidType, serde::Deserialize)]
+    enum TransferResult { Ok(candid::Nat), Err(TransferError) }
+    #[derive(CandidType, serde::Deserialize, Debug)]
+    enum TransferError { BadFee { expected_fee: candid::Nat }, InsufficientFunds { balance: candid::Nat }, TooOld, CreatedInFuture { ledger_time: u64 }, Duplicate { duplicate_of: candid::Nat }, TemporarilyUnavailable, GenericError { error_code: candid::Nat, message: String } }
+
+    let args = TransferArg { to: Account { owner: to, subaccount: None }, fee: None, memo: None, from_subaccount: None, created_at_time: None, amount: candid::Nat::from(amount) };
+    let res: Result<(TransferResult,), _> = ic_cdk::call(ledger, "icrc1_transfer", (args,)).await;
+    match res {
+        Ok((TransferResult::Ok(block),)) => Ok(block.0.try_into().unwrap_or(0)),
+        Ok((TransferResult::Err(e),)) => Err(format!("Transfer failed: {:?}", e)),
+        Err((code, msg)) => Err(format!("Call failed: {:?} - {}", code, msg))
+    }
 }
 
 #[update]
@@ -327,9 +347,29 @@ async fn claim_rewards(token_id: u64, collection: String) -> Result<u64, String>
     update_leaderboard(caller, 0, rewards);
     
     // In production, transfer $HARLEE tokens here
-    // For now, just return the amount
+    let ledger = CONFIG.with(|c| c.borrow().get().harlee_ledger).ok_or("Ledger not configured")?;
+    let _ = transfer_tokens(ledger, caller, rewards).await?;
     
     Ok(rewards)
+}
+
+async fn transfer_tokens(ledger: Principal, to: Principal, amount: u64) -> Result<u64, String> {
+    #[derive(CandidType, serde::Deserialize)]
+    struct Account { owner: Principal, subaccount: Option<Vec<u8>> }
+    #[derive(CandidType)]
+    struct TransferArg { to: Account, fee: Option<candid::Nat>, memo: Option<Vec<u8>>, from_subaccount: Option<Vec<u8>>, created_at_time: Option<u64>, amount: candid::Nat }
+    #[derive(CandidType, serde::Deserialize)]
+    enum TransferResult { Ok(candid::Nat), Err(TransferError) }
+    #[derive(CandidType, serde::Deserialize, Debug)]
+    enum TransferError { BadFee { expected_fee: candid::Nat }, InsufficientFunds { balance: candid::Nat }, TooOld, CreatedInFuture { ledger_time: u64 }, Duplicate { duplicate_of: candid::Nat }, TemporarilyUnavailable, GenericError { error_code: candid::Nat, message: String } }
+
+    let args = TransferArg { to: Account { owner: to, subaccount: None }, fee: None, memo: None, from_subaccount: None, created_at_time: None, amount: candid::Nat::from(amount) };
+    let res: Result<(TransferResult,), _> = ic_cdk::call(ledger, "icrc1_transfer", (args,)).await;
+    match res {
+        Ok((TransferResult::Ok(block),)) => Ok(block.0.try_into().unwrap_or(0)),
+        Ok((TransferResult::Err(e),)) => Err(format!("Transfer failed: {:?}", e)),
+        Err((code, msg)) => Err(format!("Call failed: {:?} - {}", code, msg))
+    }
 }
 
 fn update_leaderboard(principal: Principal, stake_delta: i32, rewards_earned: u64) {

@@ -16,18 +16,7 @@ import {
 import { useAuthStore } from '../../stores/authStore';
 import { EmptyState, LoadingSpinner, ErrorDisplay } from '../../components/shared/DataFetching';
 
-interface Load {
-  id: string;
-  origin: string;
-  destination: string;
-  distance: number;
-  weight: number;
-  rate: number;
-  equipmentType: string;
-  pickupDate: string;
-  deliveryDate: string;
-  status: 'available' | 'booked' | 'in_transit' | 'delivered';
-}
+type Load = import('../../services/logisticsService').Load;
 
 export default function LoadsPage() {
   const { isAuthenticated } = useAuthStore();
@@ -281,7 +270,13 @@ export default function LoadsPage() {
                 <div className="flex flex-col items-end gap-2">
                   <div className="text-right">
                     <p className="text-2xl font-bold text-white">${load.rate.toLocaleString()}</p>
-                    <p className="text-xs text-silver-500">${(load.rate / load.distance).toFixed(2)}/mile</p>
+                    <p className="text-xs text-silver-500">
+                      {(() => {
+                        const miles = Number.parseFloat(load.distance);
+                        const perMile = miles > 0 ? Number(load.rate) / miles : 0;
+                        return `$${perMile.toFixed(2)}/mile`;
+                      })()}
+                    </p>
                   </div>
                   <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(load.status)}`}>
                     {load.status.replace('_', ' ')}

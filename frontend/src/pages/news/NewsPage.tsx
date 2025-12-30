@@ -51,14 +51,13 @@ import {
 import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '../../stores/authStore';
-import { TOKEN_CANISTERS, formatHarlee } from '../../services/tokenService';
+import { TOKEN_CANISTERS, formatHarlee, TokenService } from '../../services/tokenService';
 import { newsService, useArticles, type Article as NewsArticle } from '../../services/newsService';
+import { AICouncil } from '../../services/aiCouncil';
 import WalletModal from '../../components/shared/WalletModal';
 import { NewspaperLayout } from '../../components/news/NewspaperLayout';
 import { ArticleSubmission } from '../../components/news/ArticleSubmission';
-
-// Use service Article type as the base, extend if needed
-type Article = NewsArticle;
+import { Principal } from '@dfinity/principal';
 
 // $HARLEE Token
 const HARLEE_TOKEN = TOKEN_CANISTERS.HARLEE;
@@ -304,7 +303,21 @@ function TipModal({ recipient, onClose, onTip, isTipping }: { recipient: string;
 }
 
 // Full Article Modal Component
-function ArticleModal({ article, onClose }: { article: ArticleWithImage; onClose: () => void }) {
+function ArticleModal({
+  article,
+  onClose,
+  refreshArticles,
+  isGenerating,
+  setIsGenerating,
+  onArticleUpdated,
+}: {
+  article: ArticleWithImage;
+  onClose: () => void;
+  refreshArticles: () => Promise<void>;
+  isGenerating: boolean;
+  setIsGenerating: (v: boolean) => void;
+  onArticleUpdated: (a: ArticleWithImage | null) => void;
+}) {
   const { isAuthenticated, principal, identity } = useAuthStore();
   const [showShare, setShowShare] = useState(false);
   const [showTip, setShowTip] = useState(false);
@@ -416,17 +429,26 @@ function ArticleModal({ article, onClose }: { article: ArticleWithImage; onClose
 
     setIsTipping(true);
     try {
-      // Distribute HARLEE rewards to article author
-      // Note: In production, article.authorPrincipal would be the actual principal
-      // For now, we'll use a placeholder and the backend will track rewards
-      await newsService.distributeHarleeRewards(
-        article.id,
-        principal.toString(), // Contributor (tipper)
+      // Direct on-chain transfer for real tokens
+      const tokenService = new TokenService(identity);
+      const result = await tokenService.transfer(
+        'HARLEE',
+        Principal.fromText(article.authorPrincipal || principal.toString()), // Default to self if no author principal
         amount
       );
-      
-      alert(`Sent ${formatHarlee(amount)} $HARLEE to ${article.author}!`);
-      setShowTip(false);
+
+      if (result.success) {
+        // Log the reward distribution on-chain
+        await newsService.distributeHarleeRewards(
+          article.id,
+          principal.toString(), // Contributor (tipper)
+          amount
+        );
+        alert(`Sent ${formatHarlee(amount)} $HARLEE to ${article.author}!`);
+        setShowTip(false);
+      } else {
+        throw new Error(result.error);
+      }
     } catch (error: any) {
       console.error('Tip error:', error);
       alert(`Failed to send tip: ${error.message}`);
@@ -549,7 +571,7 @@ function ArticleModal({ article, onClose }: { article: ArticleWithImage; onClose
                                 // Refresh the article
                                 const refreshed = await newsService.getArticle(article.id);
                                 if (refreshed) {
-                                  setSelectedArticle(refreshed as any);
+                                  onArticleUpdated(refreshed as any);
                                 }
                                 await refreshArticles();
                               } catch (error: any) {
@@ -583,7 +605,7 @@ function ArticleModal({ article, onClose }: { article: ArticleWithImage; onClose
                             // Refresh the article
                             const refreshed = await newsService.getArticle(article.id);
                             if (refreshed) {
-                              setSelectedArticle(refreshed as any);
+                              onArticleUpdated(refreshed as any);
                             }
                             await refreshArticles();
                           } catch (error: any) {
@@ -1185,6 +1207,8 @@ function MemeCard({ meme, onComment }: { meme: Meme; onComment: (memeId: string)
       content: newComment,
       timestamp: Date.now(), // Timestamp in milliseconds (matches service conversion)
       likes: 0,
+      replies: [],
+      edited: false,
     };
     setComments([...comments, comment]);
     setNewComment('');
@@ -1324,7 +1348,7 @@ export default function NewsPage() {
   // Fetch articles from backend
   const { articles, isLoading: articlesLoading, error: articlesError, refresh: refreshArticles } = useArticles(
     { limit: 50 },
-    identity
+    identity || undefined
   );
 
   // Calculate total rewards from articles
@@ -1389,11 +1413,54 @@ export default function NewsPage() {
     setGenerationError(null);
 
     try {
+      // First try on-chain generation (best when canister HTTP outcalls are working).
       await newsService.triggerArticleGeneration(persona, topic);
       await refreshArticles();
       setGenerationError(null);
     } catch (error: any) {
-      setGenerationError(error.message || 'Failed to generate article');
+      // Fallback: generate client-side (uses VITE HuggingFace key) and store on-chain via create_article.
+      try {
+        const council = new AICouncil();
+        const prompt = topic
+          ? `Write a full Raven News article in the persona "${persona}" about: ${topic}. Provide a strong title and a detailed, publish-ready article.`
+          : `Write a full Raven News article in the persona "${persona}" about a timely crypto/tech/news topic. Provide a strong title and a detailed, publish-ready article.`;
+
+        const result = await council.queryCouncil(prompt);
+        const content = result.consensus.finalResponse?.trim() || '';
+        if (!content) {
+          throw new Error('AI generation produced empty content');
+        }
+
+        // Derive title + excerpt
+        const lines = content.split('\n').map((l: string) => l.trim()).filter(Boolean);
+        const title = (lines[0] || `Raven News: ${persona}`).replace(/^#+\s*/, '').slice(0, 120);
+        const excerpt = lines.slice(1).join(' ').slice(0, 220) || content.slice(0, 220);
+        const slug = title
+          .toLowerCase()
+          .replace(/[^a-z0-9\s-]/g, '')
+          .trim()
+          .replace(/\s+/g, '-')
+          .slice(0, 80);
+
+        await newsService.createArticle({
+          title,
+          slug: slug || `article-${Date.now()}`,
+          excerpt,
+          content,
+          persona,
+          category: 'news',
+          tags: topic ? topic.split(/\s+/).slice(0, 6) : [],
+          seoTitle: title,
+          seoDescription: excerpt,
+          seoKeywords: topic ? topic.split(/\s+/).slice(0, 8) : [],
+          featured: false,
+        });
+
+        await refreshArticles();
+        setGenerationError(null);
+      } catch (fallbackErr: any) {
+        setGenerationError(fallbackErr?.message || error?.message || 'Failed to generate article');
+      }
     } finally {
       setIsGenerating(false);
     }
@@ -1581,7 +1648,7 @@ export default function NewsPage() {
                       excerpt: a.excerpt || a.content.substring(0, 200),
                       content: a.content,
                       author_persona: a.author || 'Raven',
-                      published_at: BigInt(a.publishedAt),
+                      published_at: Number(a.publishedAt) * 1_000_000,
                       category: a.category || 'news'
                     }))}
                     comics={[]}
@@ -1714,7 +1781,14 @@ export default function NewsPage() {
       {/* Modals */}
       <AnimatePresence>
         {selectedArticle && (
-          <ArticleModal article={selectedArticle} onClose={() => setSelectedArticle(null)} refreshArticles={refreshArticles} />
+          <ArticleModal
+            article={selectedArticle}
+            onClose={() => setSelectedArticle(null)}
+            refreshArticles={refreshArticles}
+            isGenerating={isGenerating}
+            setIsGenerating={setIsGenerating}
+            onArticleUpdated={setSelectedArticle}
+          />
         )}
         {showMemeUpload && (
           <MemeUploadModal onClose={() => setShowMemeUpload(false)} onSubmit={handleNewMeme} />

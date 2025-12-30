@@ -205,11 +205,9 @@ thread_local! {
     static BID_COUNTER: RefCell<u64> = RefCell::new(0);
 }
 
-const ADMIN_PRINCIPAL: &str = "lgd5r-y4x7q-lbrfa-mabgw-xurgu-4h3at-sw4sl-yyr3k-5kwgt-vlkao-jae";
-
 fn is_admin(caller: Principal) -> bool {
     CONFIG.with(|c| c.borrow().get().admin == caller)
-        || caller.to_text() == ADMIN_PRINCIPAL
+        || ic_cdk::api::is_controller(&caller)
 }
 
 fn next_load_id() -> String {
@@ -228,18 +226,13 @@ fn next_bid_id() -> String {
     })
 }
 
-// Initialization
 #[init]
 fn init() {
     let caller = ic_cdk::caller();
     
     CONFIG.with(|c| {
         let mut config = c.borrow().get().clone();
-        config.admin = if caller != Principal::anonymous() {
-            caller
-        } else {
-            Principal::from_text(ADMIN_PRINCIPAL).unwrap()
-        };
+        config.admin = caller;
         c.borrow_mut().set(config).unwrap();
     });
 }
@@ -521,9 +514,21 @@ fn get_config() -> LogisticsConfig {
     CONFIG.with(|c| c.borrow().get().clone())
 }
 
-#[query]
-fn health() -> String {
-    "OK".to_string()
+#[update]
+fn update_config(platform_fee_bps: Option<u16>, escrow_canister: Option<Principal>, kip_canister: Option<Principal>) -> Result<(), String> {
+    let caller = ic_cdk::caller();
+    if !is_admin(caller) {
+        return Err("Only admin can update config".to_string());
+    }
+    
+    CONFIG.with(|c| {
+        let mut config = c.borrow().get().clone();
+        if let Some(escrow) = escrow_canister { config.escrow_canister = escrow; }
+        if let Some(kip) = kip_canister { config.kip_canister = kip; }
+        c.borrow_mut().set(config).unwrap();
+    });
+    
+    Ok(())
 }
 
 // Generate Candid

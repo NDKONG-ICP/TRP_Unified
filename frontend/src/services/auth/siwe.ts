@@ -33,8 +33,16 @@ export interface SIWESession {
   expiresAt: bigint;
 }
 
+interface BackendSIWESession {
+  session_id: string;
+  eth_address: string;
+  principal: Principal;
+  created_at: bigint;
+  expires_at: bigint;
+}
+
 export interface SIWEVerifyResult {
-  Ok?: SIWESession;
+  Ok?: BackendSIWESession;
   Err?: string;
 }
 

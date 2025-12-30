@@ -56,6 +56,7 @@ interface BackendNewsArticle {
   excerpt: string;
   content: string;
   author_persona: { Raven: null } | { Harlee: null } | { Macho: null };
+  author_principal: [] | [{ toText: () => string }];
   category: string;
   tags: string[];
   seo_title: string;
@@ -88,15 +89,16 @@ const ravenAIIdlFactory = ({ IDL }: { IDL: any }) => {
     'Macho': IDL.Null,
   });
 
-  const NewsArticle = IDL.Record({
-    'id': IDL.Nat64,
-    'title': IDL.Text,
-    'slug': IDL.Text,
-    'excerpt': IDL.Text,
-    'content': IDL.Text,
-    'author_persona': ArticlePersona,
-    'category': IDL.Text,
-    'tags': IDL.Vec(IDL.Text),
+    const NewsArticle = IDL.Record({
+        'id': IDL.Nat64,
+        'title': IDL.Text,
+        'slug': IDL.Text,
+        'excerpt': IDL.Text,
+        'content': IDL.Text,
+        'author_persona': ArticlePersona,
+        'author_principal': IDL.Opt(IDL.Principal),
+        'category': IDL.Text,
+        'tags': IDL.Vec(IDL.Text),
     'seo_title': IDL.Text,
     'seo_description': IDL.Text,
     'seo_keywords': IDL.Vec(IDL.Text),
@@ -125,6 +127,23 @@ const ravenAIIdlFactory = ({ IDL }: { IDL: any }) => {
     'like_article': IDL.Func([IDL.Nat64], [IDL.Variant({ 'Ok': IDL.Nat64, 'Err': IDL.Text })], []),
     'share_article': IDL.Func([IDL.Nat64], [IDL.Variant({ 'Ok': IDL.Nat64, 'Err': IDL.Text })], []),
     'trigger_article_generation': IDL.Func([ArticlePersona, IDL.Opt(IDL.Text)], [IDL.Variant({ 'Ok': NewsArticle, 'Err': IDL.Text })], []),
+    'create_article': IDL.Func(
+      [
+        IDL.Text, // title
+        IDL.Text, // slug
+        IDL.Text, // excerpt
+        IDL.Text, // content
+        ArticlePersona, // persona
+        IDL.Text, // category
+        IDL.Vec(IDL.Text), // tags
+        IDL.Text, // seo_title
+        IDL.Text, // seo_description
+        IDL.Vec(IDL.Text), // seo_keywords
+        IDL.Bool, // featured
+      ],
+      [IDL.Variant({ 'Ok': NewsArticle, 'Err': IDL.Text })],
+      []
+    ),
     'distribute_article_harlee_rewards': IDL.Func([IDL.Nat64, IDL.Principal, IDL.Nat64], [IDL.Variant({ 'Ok': IDL.Nat64, 'Err': IDL.Text })], []),
     'add_article_comment': IDL.Func([IDL.Nat64, IDL.Text], [IDL.Variant({ 'Ok': ArticleComment, 'Err': IDL.Text })], []),
     'get_article_comments': IDL.Func([IDL.Nat64], [IDL.Vec(ArticleComment)], ['query']),
@@ -215,7 +234,7 @@ export class NewsService {
       excerpt: backend.excerpt,
       content: backend.content,
       author: persona,
-      authorPrincipal: '', // Not stored in backend
+      authorPrincipal: backend.author_principal?.[0]?.toText() || '',
       authorAvatar: persona === 'Raven' ? '🦅' : persona === 'Harlee' ? '💎' : '💪',
       category: backend.category as Article['category'],
       tags: backend.tags,
@@ -383,6 +402,52 @@ export class NewsService {
     }
   }
 
+  async createArticle(args: {
+    title: string;
+    slug: string;
+    excerpt: string;
+    content: string;
+    persona: 'Raven' | 'Harlee' | 'Macho';
+    category: string;
+    tags: string[];
+    seoTitle: string;
+    seoDescription: string;
+    seoKeywords: string[];
+    featured: boolean;
+  }): Promise<Article> {
+    this.ensureActor();
+    if (!this.identity) {
+      throw new Error('Authentication required to create articles');
+    }
+
+    const personaVariant =
+      args.persona === 'Raven' ? ({ Raven: null } as const) :
+      args.persona === 'Harlee' ? ({ Harlee: null } as const) :
+      ({ Macho: null } as const);
+
+    const result = await (this.actor as any).create_article(
+      args.title,
+      args.slug,
+      args.excerpt,
+      args.content,
+      personaVariant,
+      args.category,
+      args.tags,
+      args.seoTitle,
+      args.seoDescription,
+      args.seoKeywords,
+      args.featured
+    ) as { Ok?: BackendNewsArticle; Err?: string };
+
+    if (result.Err) {
+      throw new Error(result.Err);
+    }
+    if (!result.Ok) {
+      throw new Error('Article creation failed');
+    }
+    return this.convertArticle(result.Ok);
+  }
+
   /**
    * Regenerate an existing article with full content (admin only)
    */
@@ -398,14 +463,13 @@ export class NewsService {
     }
     
     try {
-      const personaVariant = persona 
-        ? (persona === 'Raven' ? { Raven: null } :
-           persona === 'Harlee' ? { Harlee: null } : { Macho: null })
-        : [];
+      const personaVariant = persona
+        ? (persona === 'Raven' ? { Raven: null } : persona === 'Harlee' ? { Harlee: null } : { Macho: null })
+        : null;
       
       const result = await (this.actor as any).regenerate_article(
         BigInt(articleId),
-        personaVariant.length > 0 ? personaVariant : [],
+        personaVariant ? [personaVariant] : [],
         topic ? [topic] : []
       ) as { Ok?: BackendNewsArticle; Err?: string };
       

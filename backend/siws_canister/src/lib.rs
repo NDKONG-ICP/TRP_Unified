@@ -10,8 +10,6 @@ use std::borrow::Cow;
 use std::cell::RefCell;
 use sha2::{Digest, Sha256};
 use hex;
-// Note: ed25519-dalek removed for WASM compatibility
-// TODO: Implement proper Ed25519 verification
 
 type Memory = VirtualMemory<DefaultMemoryImpl>;
 
@@ -165,16 +163,46 @@ fn format_siws_message(msg: &SIWSMessage) -> String {
     message
 }
 
+use ed25519_dalek::{Signature, Verifier, VerifyingKey};
+use std::convert::TryInto;
+
 fn verify_solana_signature(message: &str, signature: &str, address: &str) -> bool {
-    // Hash the message
-    let mut hasher = Sha256::new();
-    hasher.update(message.as_bytes());
-    let _message_hash = hasher.finalize();
+    let sig_bytes = if signature.starts_with("0x") {
+        match hex::decode(&signature[2..]) {
+            Ok(bytes) => bytes,
+            Err(_) => return false,
+        }
+    } else {
+        // Solana standard is base58
+        match bs58::decode(signature).into_vec() {
+            Ok(bytes) => bytes,
+            Err(_) => return false,
+        }
+    };
     
-    // TODO: Implement proper Solana Ed25519 signature verification
-    // For now, accept valid format signatures
-    // In production, this must verify the signature cryptographically
-    !address.is_empty() && !signature.is_empty()
+    let addr_bytes = match bs58::decode(address).into_vec() {
+        Ok(bytes) => bytes,
+        Err(_) => return false,
+    };
+
+    if sig_bytes.len() != 64 || addr_bytes.len() != 32 {
+        return false;
+    }
+
+    let public_key = match VerifyingKey::from_bytes(&addr_bytes.try_into().unwrap()) {
+        Ok(pk) => pk,
+        Err(_) => return false,
+    };
+
+    let signature_obj = match Signature::from_bytes(&sig_bytes.try_into().unwrap()) {
+        Ok(sig) => sig,
+        Err(_) => {
+            // Some wallets might provide a different signature format
+            return false;
+        }
+    };
+
+    public_key.verify(message.as_bytes(), &signature_obj).is_ok()
 }
 
 fn derive_principal_from_address(address: &str) -> Principal {

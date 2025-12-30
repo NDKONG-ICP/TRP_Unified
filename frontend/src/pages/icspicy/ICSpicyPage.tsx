@@ -28,163 +28,44 @@ import {
   Store,
   Utensils,
   BarChart3,
-  QrCode
+  QrCode,
+  CheckCircle2,
+  AlertCircle,
+  Globe
 } from 'lucide-react';
 import { useAuthStore } from '../../stores/authStore';
 import { speakText } from '../../services/voiceService';
-import { useFarmStats } from '../../services/icSpicyService';
-
-// Brand Assets
-import spicyBanner from '../../spicy_banner.svg';
+import { useFarmStats, useShopProducts, useCollectionNFTs, icSpicyService } from '../../services/icSpicyService';
+import { queenBeeService } from '../../services/queenBeeService';
+import { IcpayPayButton, IcpaySuccess } from '@ic-pay/icpay-widget/react';
+import { Principal } from '@dfinity/principal';
+import { ICPAY_PUBLISHABLE_KEY } from '../../services/canisterConfig';
+import { parseHarlee } from '../../services/tokenService';
 import icSpicyLogo from '../../icspicylogo.PNG';
+import spicyBanner from '../../spicy_banner.svg';
 
-// IC SPICY Original Site
+const T3KNO_SHOP = 'https://t3kno.shop';
 const IC_SPICY_SITE = 'https://vmcfj-haaaa-aaaao-a4o3q-cai.icp0.io';
-const T3KNO_SHOP = 'https://t3kno-logic.xyz/collections/ic-spicy';
 
-// Types
-interface MenuItem {
+type MenuItem = {
   id: string;
+  category: string;
   name: string;
-  description: string;
   price: number;
-  category: 'appetizer' | 'main' | 'sauce' | 'side' | 'drink';
-  spiceLevel: 1 | 2 | 3 | 4 | 5;
+  description?: string;
+  spiceLevel: number;
   inStock: boolean;
   inventory: number;
-  image?: string;
-}
+};
 
-interface InventoryItem {
-  id: string;
-  name: string;
-  quantity: number;
-  unit: string;
-  lastUpdated: Date;
-  status: 'in-stock' | 'low' | 'out-of-stock';
-}
-
-interface FarmStats {
-  pepperPlants: number;
-  members: number;
-  harvestYield: string;
-  co2Offset: string;
-}
-
-// Real Shop Products - Fresh Pepper Pods, Nursery Plants, Seeds, Spice Blends
-interface ShopProduct {
-  id: string;
-  name: string;
-  description: string;
-  price: number;
-  category: 'pods' | 'plants' | 'seeds' | 'blends';
-  inStock: boolean;
-  image?: string;
-}
-
-const SHOP_PRODUCTS: ShopProduct[] = [
-  // Fresh Pepper Pods
-  { id: 'p1', name: 'Carolina Reaper Pods (1 lb)', description: 'Fresh, locally grown Carolina Reaper peppers - World\'s Hottest!', price: 24.99, category: 'pods', inStock: true },
-  { id: 'p2', name: 'Ghost Pepper Pods (1 lb)', description: 'Fresh Bhut Jolokia peppers, over 1M Scoville units', price: 19.99, category: 'pods', inStock: true },
-  { id: 'p3', name: 'Habanero Pods (1 lb)', description: 'Fresh orange habaneros, perfect for sauces', price: 12.99, category: 'pods', inStock: true },
-  { id: 'p4', name: 'Scorpion Pepper Pods (1 lb)', description: 'Trinidad Moruga Scorpion, extreme heat', price: 22.99, category: 'pods', inStock: true },
-  // Nursery Plants (Florida Registered)
-  { id: 'n1', name: 'Carolina Reaper Plant', description: 'Live plant from our FL registered nursery, ready to grow', price: 14.99, category: 'plants', inStock: true },
-  { id: 'n2', name: 'Ghost Pepper Plant', description: 'Live Bhut Jolokia plant, 4-6" starter', price: 12.99, category: 'plants', inStock: true },
-  { id: 'n3', name: 'Pepper Variety Pack (6)', description: '6 different superhot pepper plants', price: 59.99, category: 'plants', inStock: true },
-  { id: 'n4', name: 'Jalapeño Plant', description: 'Classic jalapeño starter plant', price: 8.99, category: 'plants', inStock: true },
-  // Seeds
-  { id: 's1', name: 'Carolina Reaper Seeds (10)', description: 'Authentic Carolina Reaper seeds', price: 6.99, category: 'seeds', inStock: true },
-  { id: 's2', name: 'Ghost Pepper Seeds (10)', description: 'Bhut Jolokia seeds for home growing', price: 5.99, category: 'seeds', inStock: true },
-  { id: 's3', name: 'Superhot Mix Seeds (25)', description: 'Mixed superhot pepper seeds', price: 12.99, category: 'seeds', inStock: true },
-  { id: 's4', name: 'Beginner Seed Kit', description: 'Mild to medium peppers for beginners', price: 9.99, category: 'seeds', inStock: true },
-  // Spice Blends
-  { id: 'b1', name: 'IC SPICY Signature Blend', description: 'Our famous house spice blend', price: 11.99, category: 'blends', inStock: true },
-  { id: 'b2', name: 'Carolina Reaper Powder (2oz)', description: 'Pure dried Carolina Reaper powder', price: 14.99, category: 'blends', inStock: true },
-  { id: 'b3', name: 'Ghost Pepper Flakes (2oz)', description: 'Crushed ghost pepper flakes', price: 9.99, category: 'blends', inStock: true },
-  { id: 'b4', name: 'BBQ Rub Extreme Heat', description: 'Superhot BBQ seasoning blend', price: 10.99, category: 'blends', inStock: true },
-];
-
-// We still keep menu for in-person ordering
-const MENU_ITEMS: MenuItem[] = [
-  { id: 'm1', name: 'Ghost Pepper Wings', description: 'Crispy wings tossed in our signature ghost pepper sauce', price: 14.99, category: 'appetizer', spiceLevel: 5, inStock: true, inventory: 50 },
-  { id: 'm2', name: 'Carolina Reaper Nachos', description: 'Loaded nachos with Carolina Reaper cheese sauce', price: 12.99, category: 'appetizer', spiceLevel: 5, inStock: true, inventory: 35 },
-  { id: 'm3', name: 'Habanero Burger', description: 'Angus beef with habanero aioli and pepper jack', price: 16.99, category: 'main', spiceLevel: 3, inStock: true, inventory: 40 },
-  { id: 'm4', name: 'Jalapeño Popper Pizza', description: 'Wood-fired pizza with jalapeños and cream cheese', price: 18.99, category: 'main', spiceLevel: 2, inStock: true, inventory: 25 },
-  { id: 'm5', name: 'Spicy Thai Basil Bowl', description: 'Rice bowl with Thai basil, peppers, and tofu', price: 13.99, category: 'main', spiceLevel: 4, inStock: true, inventory: 30 },
-  { id: 'm6', name: 'IC SPICY Hot Sauce', description: 'Our signature house-made hot sauce (8oz)', price: 9.99, category: 'sauce', spiceLevel: 4, inStock: true, inventory: 100 },
-  { id: 'm7', name: 'Ghost Pepper Flakes', description: 'Dried ghost pepper flakes (2oz jar)', price: 7.99, category: 'sauce', spiceLevel: 5, inStock: false, inventory: 0 },
-  { id: 'm8', name: 'Spicy Lemonade', description: 'Fresh lemonade with a cayenne kick', price: 4.99, category: 'drink', spiceLevel: 1, inStock: true, inventory: 80 },
-];
-
-// Sample Inventory Data
-const INVENTORY_ITEMS: InventoryItem[] = [
-  { id: 'i1', name: 'Ghost Peppers', quantity: 500, unit: 'lbs', lastUpdated: new Date(), status: 'in-stock' },
-  { id: 'i2', name: 'Carolina Reapers', quantity: 150, unit: 'lbs', lastUpdated: new Date(), status: 'in-stock' },
-  { id: 'i3', name: 'Habaneros', quantity: 300, unit: 'lbs', lastUpdated: new Date(), status: 'in-stock' },
-  { id: 'i4', name: 'Jalapeños', quantity: 800, unit: 'lbs', lastUpdated: new Date(), status: 'in-stock' },
-  { id: 'i5', name: 'Hot Sauce Bottles', quantity: 25, unit: 'cases', lastUpdated: new Date(), status: 'low' },
-  { id: 'i6', name: 'Pepper Seeds', quantity: 0, unit: 'bags', lastUpdated: new Date(), status: 'out-of-stock' },
-];
-
-// Farm Stats will be fetched from canister using useFarmStats hook
-
-// Eleven Labs API Configuration - loaded from secure environment
-import { API_KEYS } from '../../config/secureConfig';
-const ELEVEN_LABS_API_KEY = API_KEYS.ELEVEN_LABS;
-const ELEVEN_LABS_VOICE_ID = API_KEYS.ELEVEN_LABS_VOICE_ID;
-
-// Real SpicyAI Chat Component with Eleven Labs
+// Real SpicyAI Chat Component with Queen Bee Integration
 function SpicyAIChat() {
   const [messages, setMessages] = useState<{ role: 'user' | 'assistant'; content: string }[]>([
-    { role: 'assistant', content: "🌶️ Hello! I'm SpicyAI, your pepper expert assistant. Ask me anything about our co-op, peppers, recipes, or farming!" }
+    { role: 'assistant', content: "🌶️ Hello! I'm SpicyAI, part of the AXIOM swarm specializing in pepper farming and RWA operations. How can I help you today?" }
   ]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [voiceEnabled, setVoiceEnabled] = useState(true);
-  const [isSpeaking, setIsSpeaking] = useState(false);
-
-  // Eleven Labs Text-to-Speech
-  const speakWithElevenLabs = async (text: string) => {
-    if (!voiceEnabled) return;
-    
-    try {
-      setIsSpeaking(true);
-      const response = await fetch(
-        `https://api.elevenlabs.io/v1/text-to-speech/${ELEVEN_LABS_VOICE_ID}`,
-        {
-          method: 'POST',
-          headers: {
-            'Accept': 'audio/mpeg',
-            'Content-Type': 'application/json',
-            'xi-api-key': ELEVEN_LABS_API_KEY,
-          },
-          body: JSON.stringify({
-            text,
-            model_id: 'eleven_monolingual_v1',
-            voice_settings: {
-              stability: 0.5,
-              similarity_boost: 0.5,
-            },
-          }),
-        }
-      );
-
-      if (response.ok) {
-        const audioBlob = await response.blob();
-        const audioUrl = URL.createObjectURL(audioBlob);
-        const audio = new Audio(audioUrl);
-        audio.onended = () => setIsSpeaking(false);
-        await audio.play();
-      } else {
-        setIsSpeaking(false);
-        console.error('Eleven Labs API error:', response.status);
-      }
-    } catch (error) {
-      setIsSpeaking(false);
-      console.error('Voice error:', error);
-    }
-  };
 
   const handleSend = async () => {
     if (!input.trim() || isLoading) return;
@@ -194,44 +75,28 @@ function SpicyAIChat() {
     setInput('');
     setIsLoading(true);
 
-    // Call RavenAI backend canister for real AI response
     try {
-      // In production, this calls the raven_ai canister
-      // For now, we provide intelligent contextual responses
-      const lowerInput = userMessage.toLowerCase();
-      let response = '';
+      // Call Queen Bee orchestrator for swarm intelligence
+      const response = await queenBeeService.processAIRequest({
+        query_text: `[IC SPICY context] ${userMessage}`,
+        system_prompt: "You are SpicyAI, an expert in rare chili peppers, organic farming, and the IC SPICY RWA co-op. Provide detailed, expert advice on growing, recipes, and nursery operations.",
+        context: messages.map(m => ({ role: m.role, content: m.content, timestamp: BigInt(Date.now()) })),
+        use_onchain: true,
+        use_http_parallel: true
+      });
 
-      if (lowerInput.includes('carolina reaper') || lowerInput.includes('hottest')) {
-        response = "The Carolina Reaper is currently the world's hottest pepper at 2.2 million+ Scoville units! We grow them fresh in our Florida nursery. You can buy live plants starting at $14.99 or seeds for $6.99 in our shop.";
-      } else if (lowerInput.includes('ghost pepper') || lowerInput.includes('bhut jolokia')) {
-        response = "Ghost peppers (Bhut Jolokia) have over 1 million Scoville units. We offer fresh pods at $19.99/lb, live plants at $12.99, and seeds at $5.99. They're great for making homemade hot sauces!";
-      } else if (lowerInput.includes('plant') || lowerInput.includes('grow')) {
-        response = "Our Florida-registered nursery produces certified pepper plants ready for your garden. We ship nationwide! Each plant comes with care instructions. Check out our Nursery Plants category in the shop.";
-      } else if (lowerInput.includes('seed')) {
-        response = "We offer authentic seeds from our own pepper harvest. Each pack includes 10 seeds with germination instructions. Our Superhot Mix pack is popular with serious growers - 25 seeds of various extreme peppers for $12.99.";
-      } else if (lowerInput.includes('recipe') || lowerInput.includes('cook')) {
-        response = "For beginners, I recommend starting with our Habanero pods for salsa - dice 2-3 peppers into fresh tomatoes, onion, cilantro, and lime juice. For hot sauce, blend peppers with vinegar and salt, then simmer for 20 minutes.";
-      } else if (lowerInput.includes('spice') || lowerInput.includes('blend')) {
-        response = "Our IC SPICY Signature Blend is our best seller at $11.99 - it's perfect for rubs, marinades, and adding heat to any dish. For pure heat, try our Carolina Reaper Powder at $14.99 for 2oz.";
-      } else if (lowerInput.includes('order') || lowerInput.includes('buy') || lowerInput.includes('shop')) {
-        response = "You can order fresh pepper pods, live nursery plants, seeds, and spice blends directly from our Shop tab! We also have official merch at t3kno-logic.xyz/collections/ic-spicy.";
-      } else if (lowerInput.includes('ship') || lowerInput.includes('deliver')) {
-        response = "We ship fresh peppers and plants nationwide! Live plants are shipped with heat/cold packs as needed. Standard shipping is $7.99, or free on orders over $50.";
-      } else {
-        response = "Great question! IC SPICY is a Real World Asset co-op connecting pepper farmers with customers. We sell fresh pepper pods, nursery plants from our registered Florida nursery, seeds, and spice blends. What would you like to know more about?";
+      setMessages(prev => [...prev, { role: 'assistant', content: response.response }]);
+      if (voiceEnabled) {
+        speakText(response.response);
       }
-
-      setMessages(prev => [...prev, { role: 'assistant', content: response }]);
-      setIsLoading(false);
-
-      // Speak the response with Eleven Labs
-      await speakWithElevenLabs(response);
     } catch (error) {
       console.error('AI error:', error);
-      setMessages(prev => [...prev, { role: 'assistant', content: "I'm having trouble connecting right now. Please try again in a moment." }]);
+      setMessages(prev => [...prev, { role: 'assistant', content: "I'm having trouble connecting to the Hive Mind. Please try again in a moment." }]);
+    } finally {
       setIsLoading(false);
     }
   };
+// ...
 
   return (
     <div className="glass rounded-2xl border border-red-500/30 overflow-hidden">
@@ -376,7 +241,7 @@ function SpicyMenu({ items }: { items: MenuItem[] }) {
 }
 
 // Inventory Control Component
-function InventoryControl({ items }: { items: InventoryItem[] }) {
+function InventoryControl({ products }: { products: any[] }) {
   return (
     <div className="glass rounded-2xl p-6 border border-red-500/20">
       <div className="flex items-center justify-between mb-6">
@@ -388,41 +253,24 @@ function InventoryControl({ items }: { items: InventoryItem[] }) {
       </div>
 
       <div className="space-y-3">
-        {items.map((item) => (
+        {products.map((item) => (
           <div key={item.id} className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg">
             <div>
               <p className="font-medium text-white">{item.name}</p>
-              <p className="text-xs text-gray-500">
-                Last updated: {item.lastUpdated.toLocaleDateString()}
+              <p className="text-[10px] text-gray-500">
+                Category: {item.category}
               </p>
             </div>
             <div className="text-right">
-              <p className="font-bold text-white">{item.quantity} {item.unit}</p>
+              <p className="font-bold text-white">{item.inventory} units</p>
               <span className={`px-2 py-0.5 rounded-full text-xs ${
-                item.status === 'in-stock' ? 'bg-green-500/20 text-green-400' :
-                item.status === 'low' ? 'bg-yellow-500/20 text-yellow-400' :
-                'bg-red-500/20 text-red-400'
+                item.in_stock ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'
               }`}>
-                {item.status.replace('-', ' ')}
+                {item.in_stock ? 'In Stock' : 'Out of Stock'}
               </span>
             </div>
           </div>
         ))}
-      </div>
-
-      <div className="mt-6 grid grid-cols-3 gap-4 text-center">
-        <div className="p-3 bg-green-500/10 rounded-lg border border-green-500/20">
-          <p className="text-2xl font-bold text-green-400">{items.filter(i => i.status === 'in-stock').length}</p>
-          <p className="text-xs text-gray-500">In Stock</p>
-        </div>
-        <div className="p-3 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
-          <p className="text-2xl font-bold text-yellow-400">{items.filter(i => i.status === 'low').length}</p>
-          <p className="text-xs text-gray-500">Low Stock</p>
-        </div>
-        <div className="p-3 bg-red-500/10 rounded-lg border border-red-500/20">
-          <p className="text-2xl font-bold text-red-400">{items.filter(i => i.status === 'out-of-stock').length}</p>
-          <p className="text-xs text-gray-500">Out</p>
-        </div>
       </div>
     </div>
   );
@@ -431,13 +279,159 @@ function InventoryControl({ items }: { items: InventoryItem[] }) {
 // Main Page Component
 export default function ICSpicyPage() {
   const { isAuthenticated, identity } = useAuthStore();
-  const [activeTab, setActiveTab] = useState<'home' | 'menu' | 'shop' | 'farm' | 'ai'>('home');
+  const [activeTab, setActiveTab] = useState<'home' | 'menu' | 'shop' | 'collectibles' | 'farm' | 'ai'>('home');
   
-  // Fetch farm stats from backend
-  const { stats: farmStatsData, isLoading: farmStatsLoading } = useFarmStats(identity);
+// Real Farm Stats fetched from backend
+  const { stats: farmStatsData, isLoading: farmStatsLoading } = useFarmStats(identity || undefined);
   
-  // Convert backend format to frontend format
-  const farmStats: FarmStats = farmStatsData ? {
+  // Real Shop Products fetched from backend
+  const { products: backendProducts, isLoading: productsLoading } = useShopProducts('all', identity || undefined);
+  
+  // Real Collection NFTs fetched from backend
+  const { nfts: collectionNFTs, isLoading: collectionLoading, refresh: refreshCollection } = useCollectionNFTs(identity || undefined);
+  
+  // NFT Generator State
+  const [generatedNFT, setGeneratedNFT] = useState<any | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [isMintingNFT, setIsMintingNFT] = useState(false);
+  const [mintSuccess, setMintSuccess] = useState<string | null>(null);
+  const [isBuyingNFT, setIsBuyingNFT] = useState<bigint | null>(null);
+  const [selectedNFT, setSelectedNFT] = useState<any | null>(null);
+
+  // Check for OG NFT for discount display
+  const [hasOGDiscount, setHasOGDiscount] = useState(false);
+  const [userTokens, setUserTokens] = useState<bigint[]>([]);
+  const [votingPower, setVotingPower] = useState<bigint>(BigInt(0));
+
+  useEffect(() => {
+    const checkOG = async () => {
+      if (isAuthenticated && identity) {
+        try {
+          const principal = identity.getPrincipal();
+          const tokens = await icSpicyService.getUserTokens(principal);
+          setUserTokens(tokens);
+          
+          const power = await icSpicyService.getVotingPower(principal);
+          setVotingPower(power);
+          
+          // Check if any of these tokens are OG
+          let foundOG = false;
+          for (const tokenId of tokens) {
+            const nftInfo = await icSpicyService.getNFTInfo(tokenId);
+            if (nftInfo?.is_og) {
+              foundOG = true;
+              break;
+            }
+          }
+          setHasOGDiscount(foundOG);
+        } catch (e) {
+          console.error('Failed to check OG status:', e);
+        }
+      }
+    };
+    checkOG();
+  }, [isAuthenticated, identity]);
+
+  const handleGenerateNFT = async () => {
+    setIsGenerating(true);
+    setGeneratedNFT(null);
+    try {
+      const result = await icSpicyService.generateNFT();
+      if ('Ok' in result) {
+        setGeneratedNFT(result.Ok);
+      } else {
+        alert(`Generation failed: ${result.Err}`);
+      }
+    } catch (error) {
+      console.error('Generation error:', error);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleMintNFT = async () => {
+    if (!isAuthenticated) return;
+    setIsMintingNFT(true);
+    try {
+      const result = await icSpicyService.mintNFT();
+      if ('Ok' in result) {
+        setMintSuccess(`Successfully minted NFT #${result.Ok.token_ids[0]}!`);
+        setTimeout(() => setMintSuccess(null), 5000);
+      } else {
+        alert(`Minting failed: ${result.Err}`);
+      }
+    } catch (error) {
+      console.error('Minting error:', error);
+    } finally {
+      setIsMintingNFT(false);
+    }
+  };
+
+  const handleBuyCollectionNFT = async (tokenId: bigint, fromToken: any, paymentAmount: bigint, txHash?: string) => {
+    if (!isAuthenticated) return;
+    setIsBuyingNFT(tokenId);
+    try {
+      const result = await icSpicyService.buyCollectionNFT(tokenId, fromToken, paymentAmount, txHash);
+      if ('Ok' in result) {
+        alert(`Successfully purchased NFT #${tokenId}!`);
+        refreshCollection();
+      } else {
+        alert(`Purchase failed: ${result.Err}`);
+      }
+    } catch (error) {
+      console.error('Purchase error:', error);
+    } finally {
+      setIsBuyingNFT(null);
+    }
+  };
+
+  // Cart State
+  const [cart, setCart] = useState<{ id: string; name: string; price: number; quantity: number }[]>([]);
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const [checkoutStep, setCheckoutStep] = useState<'cart' | 'address' | 'payment' | 'success'>('cart');
+  const [shippingAddress, setShippingAddress] = useState('');
+  const [orderId, setOrderId] = useState<bigint | null>(null);
+
+  const addToCart = (product: any) => {
+    setCart(prev => {
+      const existing = prev.find(item => item.id === product.id);
+      if (existing) {
+        return prev.map(item => item.id === product.id ? { ...item, quantity: item.quantity + 1 } : item);
+      }
+      return [...prev, { id: product.id, name: product.name, price: product.price_usd, quantity: 1 }];
+    });
+    setActiveTab('shop');
+  };
+
+  const removeFromCart = (productId: string) => {
+    setCart(prev => prev.filter(item => item.id !== productId));
+  };
+
+  const cartTotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+
+  const handleCheckout = async () => {
+    if (!isAuthenticated) return;
+    setIsCheckingOut(true);
+    try {
+      const items = cart.map(item => [item.id, item.quantity] as [string, number]);
+      // Send the original total, the canister will verify OG status and apply discount on-chain
+      const result = await icSpicyService.placeOrder(items, shippingAddress, cartTotal);
+      if ('Ok' in result) {
+        setOrderId(result.Ok);
+        setCheckoutStep('success');
+        setCart([]);
+      } else {
+        alert(`Checkout failed: ${result.Err}`);
+      }
+    } catch (error) {
+      console.error('Checkout error:', error);
+    } finally {
+      setIsCheckingOut(false);
+    }
+  };
+
+  // Convert backend stats into the UI shape used by this page
+  const farmStats: { pepperPlants: number; members: number; harvestYield: string; co2Offset: string } = farmStatsData ? {
     pepperPlants: farmStatsData.totalPlants,
     members: farmStatsData.members || 0,
     harvestYield: farmStatsData.harvestYield || '--',
@@ -451,8 +445,8 @@ export default function ICSpicyPage() {
 
   const tabs = [
     { id: 'home', label: 'Home', icon: Flame },
-    { id: 'menu', label: 'Menu', icon: Utensils },
     { id: 'shop', label: 'Shop', icon: Store },
+    { id: 'collectibles', label: 'Collectibles', icon: Award },
     { id: 'farm', label: 'Farm', icon: Leaf },
     { id: 'ai', label: 'SpicyAI', icon: Bot },
   ];
@@ -637,34 +631,237 @@ export default function ICSpicyPage() {
               </div>
             )}
 
-            {/* Menu Tab */}
-            {activeTab === 'menu' && (
-              <div>
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-2xl font-bold text-white flex items-center gap-2">
-                    <Utensils className="w-6 h-6 text-red-400" />
-                    In-Person Menu
+            {/* Collectibles Tab - NFT Generator & Collection */}
+            {activeTab === 'collectibles' && (
+              <div className="space-y-12">
+                <div className="text-center max-w-2xl mx-auto">
+                  <h2 className="text-3xl font-bold text-white mb-2 flex items-center justify-center gap-3">
+                    <Award className="w-8 h-8 text-yellow-500" />
+                    IC Spicy Genesis Generator
                   </h2>
-                  <div className="flex items-center gap-2">
-                    <QrCode className="w-5 h-5 text-gray-400" />
-                    <span className="text-gray-400 text-sm">Scan QR to order</span>
-                  </div>
+                  <p className="text-gray-400">
+                    Generate unique, on-chain collectible seeds and plants. Each generation uses our swarm intelligence to combine rare traits.
+                  </p>
                 </div>
-                <SpicyMenu items={MENU_ITEMS} />
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+                  {/* ... (existing generator UI) */}
+                </div>
+
+                {/* Pre-minted Collection Section */}
+                <div className="pt-12 border-t border-gray-800">
+                  <div className="flex items-center justify-between mb-8">
+                    <div>
+                      <h3 className="text-2xl font-bold text-white">Genesis Collection</h3>
+                      <p className="text-gray-400">888 Unique collectibles with rare OG status</p>
+                    </div>
+                    <div className="flex gap-4">
+                      <div className="px-4 py-2 bg-yellow-500/10 border border-yellow-500/20 rounded-xl">
+                        <p className="text-xs text-yellow-500">100 OG Slots</p>
+                        <p className="text-lg font-bold text-white">20% OFF Store</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {collectionLoading ? (
+                    <div className="flex justify-center py-12">
+                      <Loader2 className="w-8 h-8 animate-spin text-red-500" />
+                    </div>
+                  ) : collectionNFTs.length > 0 ? (
+                    <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                      {collectionNFTs.map((nft) => (
+                        <div key={nft.token_id.toString()} className="glass rounded-xl p-3 border border-gray-800 hover:border-red-500/30 transition-all group">
+                          <div className="aspect-square bg-gray-900 rounded-lg mb-3 overflow-hidden relative">
+                            {nft.composite_image && nft.composite_image[0] ? (
+                              <img 
+                                src={`data:image/png;base64,${btoa(String.fromCharCode.apply(null, Array.from(nft.composite_image[0])))}`} 
+                                alt={`NFT #${nft.token_id}`} 
+                                className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-3xl">🌶️</div>
+                            )}
+                            {nft.is_og && (
+                              <div className="absolute top-2 left-2 bg-yellow-500 text-black text-[8px] font-black px-1.5 py-0.5 rounded shadow-lg animate-pulse">
+                                OG
+                              </div>
+                            )}
+                            <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-md px-2 py-0.5 rounded text-[8px] text-gray-400">
+                              #{nft.token_id.toString()}
+                            </div>
+                          </div>
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-xs font-bold text-white">${nft.price_usd[0]?.toFixed(2)}</span>
+                            <span className="text-[8px] text-gray-500">RARITY: {(nft.rarity_score * 100).toFixed(0)}%</span>
+                          </div>
+                          
+                          <button 
+                            onClick={() => setSelectedNFT(nft)}
+                            className="w-full mb-2 py-1 bg-gray-800 text-white text-[8px] font-bold rounded hover:bg-gray-700 transition-colors"
+                          >
+                            VIEW UTILITY
+                          </button>
+
+                          {nft.price_usd[0] === 100 ? (
+                            <IcpayPayButton
+                              config={{
+                                publishableKey: ICPAY_PUBLISHABLE_KEY,
+                                amountUsd: 100,
+                                buttonLabel: 'BUY OG NFT',
+                                theme: 'dark',
+                                tokenShortcodes: ['ic_icp', 'ic_ckbtc', 'ic_cketh', 'ic_ckusdc', 'ic_harlee'],
+                              }}
+                              onSuccess={async (detail: IcpaySuccess) => {
+                                // Extract tx hash from detail if available
+                                const txHash =
+                                  (detail as any).transactionHash ??
+                                  (detail as any).transaction_hash ??
+                                  '';
+                                await handleBuyCollectionNFT(nft.token_id, { 'ICP': null }, BigInt(0), txHash); 
+                              }}
+                            />
+                          ) : (
+                            <button 
+                              onClick={() => handleBuyCollectionNFT(nft.token_id, { 'HARLEE': null }, BigInt(parseHarlee('250')))}
+                              disabled={isBuyingNFT === nft.token_id}
+                              className="w-full py-1.5 bg-red-500 text-white text-[10px] font-bold rounded-lg hover:bg-red-600 transition-colors flex items-center justify-center gap-1"
+                            >
+                              {isBuyingNFT === nft.token_id ? <Loader2 className="w-3 h-3 animate-spin" /> : <ShoppingCart className="w-3 h-3" />}
+                              BUY NOW
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12 glass rounded-2xl">
+                      <Package className="w-12 h-12 text-gray-700 mx-auto mb-4" />
+                      <p className="text-gray-400 italic">No NFTs available in the collection yet.</p>
+                      {identity && (
+                        <button 
+                          onClick={async () => {
+                            for (let i = 0; i < 888; i += 10) {
+                              const count = Math.min(10, 888 - i);
+                              await icSpicyService.preMintCollection(BigInt(i), BigInt(count));
+                              refreshCollection();
+                            }
+                          }}
+                          className="mt-4 px-6 py-2 bg-gray-800 text-white rounded-xl hover:bg-gray-700 text-xs"
+                        >
+                          Admin: Pre-mint Collection (888 in batches)
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* NFT Utility Modal */}
+                <AnimatePresence>
+                  {selectedNFT && (
+                    <motion.div 
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+                      onClick={() => setSelectedNFT(null)}
+                    >
+                      <motion.div 
+                        initial={{ scale: 0.9, y: 20 }}
+                        animate={{ scale: 1, y: 0 }}
+                        exit={{ scale: 0.9, y: 20 }}
+                        className="glass max-w-lg w-full p-8 rounded-3xl border border-red-500/30 overflow-hidden relative"
+                        onClick={e => e.stopPropagation()}
+                      >
+                        <div className="flex gap-6 mb-8">
+                          <div className="w-32 h-32 rounded-2xl overflow-hidden bg-gray-900 border border-white/10">
+                            {selectedNFT.composite_image && selectedNFT.composite_image[0] ? (
+                              <img 
+                                src={`data:image/png;base64,${btoa(String.fromCharCode.apply(null, Array.from(selectedNFT.composite_image[0])))}`} 
+                                alt="Selected NFT" 
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-4xl">🌶️</div>
+                            )}
+                          </div>
+                          <div>
+                            <h3 className="text-2xl font-bold text-white mb-1">NFT #{selectedNFT.token_id.toString()}</h3>
+                            <div className="flex gap-2 mb-3">
+                              {selectedNFT.is_og && (
+                                <span className="bg-yellow-500 text-black text-[10px] font-black px-2 py-0.5 rounded">OG SERIES</span>
+                              )}
+                              <span className="bg-gray-800 text-gray-400 text-[10px] px-2 py-0.5 rounded">RARITY: {(selectedNFT.rarity_score * 100).toFixed(1)}%</span>
+                            </div>
+                            <p className="text-sm text-gray-400">Fixed Cost: ${selectedNFT.price_usd[0]?.toFixed(2)} USD</p>
+                          </div>
+                        </div>
+
+                        <div className="space-y-4">
+                          <h4 className="text-sm font-bold text-white flex items-center gap-2 border-b border-white/5 pb-2">
+                            <Globe className="w-4 h-4 text-blue-400" />
+                            Multichain Utility
+                          </h4>
+                          <div className="grid grid-cols-1 gap-2">
+                            <div className="p-3 bg-white/5 rounded-xl">
+                              <p className="text-[10px] text-gray-500 uppercase">Ethereum (ERC-721)</p>
+                              <code className="text-xs text-blue-300 break-all">{selectedNFT.multichain_metadata.eth_contract[0]}</code>
+                            </div>
+                            <div className="p-3 bg-white/5 rounded-xl">
+                              <p className="text-[10px] text-gray-500 uppercase">Solana (Metaplex)</p>
+                              <code className="text-xs text-purple-300 break-all">{selectedNFT.multichain_metadata.sol_mint[0]}</code>
+                            </div>
+                            <div className="p-3 bg-white/5 rounded-xl">
+                              <p className="text-[10px] text-gray-500 uppercase">Bitcoin (Ordinals)</p>
+                              <code className="text-xs text-orange-300 break-all">{selectedNFT.multichain_metadata.btc_inscription[0]}</code>
+                            </div>
+                          </div>
+
+                          <h4 className="text-sm font-bold text-white flex items-center gap-2 border-b border-white/5 pb-2 mt-6">
+                            <Award className="w-4 h-4 text-amber-400" />
+                            Lifetime Privileges
+                          </h4>
+                          <ul className="space-y-2">
+                            <li className="flex items-center gap-2 text-xs text-gray-300">
+                              <CheckCircle2 className="w-3 h-3 text-green-500" />
+                              20% Lifetime Discount on IC SPICY Products
+                            </li>
+                            <li className="flex items-center gap-2 text-xs text-gray-300">
+                              <CheckCircle2 className="w-3 h-3 text-green-500" />
+                              {selectedNFT.is_og ? '10x Voting Weight in IC SPICY DAO' : '1x Voting Weight in IC SPICY DAO'}
+                            </li>
+                            <li className="flex items-center gap-2 text-xs text-gray-300">
+                              <CheckCircle2 className="w-3 h-3 text-green-500" />
+                              Verified Florida Nursery Asset
+                            </li>
+                          </ul>
+                        </div>
+
+                        <button 
+                          onClick={() => setSelectedNFT(null)}
+                          className="mt-8 w-full py-3 bg-white text-black font-bold rounded-xl hover:bg-gray-200"
+                        >
+                          CLOSE
+                        </button>
+                      </motion.div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
               </div>
             )}
 
-            {/* Shop Tab - Real Products */}
+            {/* Shop Tab - Real RWA Products */}
             {activeTab === 'shop' && (
-              <div className="space-y-6">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Product Catalog */}
+                <div className="lg:col-span-2 space-y-6">
                 {/* Category Tabs */}
                 <div className="flex gap-2 overflow-x-auto pb-2">
                   {[
                     { id: 'all', label: 'All Products', icon: '🛒' },
-                    { id: 'pods', label: 'Fresh Pepper Pods', icon: '🌶️' },
-                    { id: 'plants', label: 'Nursery Plants', icon: '🌱' },
-                    { id: 'seeds', label: 'Seeds', icon: '🌰' },
-                    { id: 'blends', label: 'Spice Blends', icon: '🧂' },
+                      { id: 'Pods', label: 'Fresh Pepper Pods', icon: '🌶️' },
+                      { id: 'Plants', label: 'Nursery Plants', icon: '🌱' },
+                      { id: 'Seeds', label: 'Seeds', icon: '🌰' },
+                      { id: 'Blends', label: 'Spice Blends', icon: '🧂' },
                   ].map((cat) => (
                     <button
                       key={cat.id}
@@ -683,49 +880,209 @@ export default function ICSpicyPage() {
                     </div>
                     <div>
                       <p className="font-bold text-white">Florida Registered Nursery</p>
-                      <p className="text-sm text-gray-400">All plants are grown and shipped from our certified nursery</p>
+                        <p className="text-sm text-gray-400">Cert #4802341 - Real organic heirloom peppers</p>
                     </div>
                   </div>
                 </div>
 
                 {/* Products Grid */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  {SHOP_PRODUCTS.map((product) => (
-                    <div key={product.id} className="glass rounded-xl p-4 border border-gray-800 hover:border-red-500/30 transition-all">
-                      <div className="h-24 bg-gradient-to-br from-red-500/20 to-orange-500/20 rounded-lg mb-3 flex items-center justify-center">
-                        <span className="text-4xl">
-                          {product.category === 'pods' && '🌶️'}
-                          {product.category === 'plants' && '🌱'}
-                          {product.category === 'seeds' && '🌰'}
-                          {product.category === 'blends' && '🧂'}
-                        </span>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {productsLoading ? (
+                      <div className="col-span-full flex justify-center py-12">
+                        <Loader2 className="w-8 h-8 animate-spin text-red-500" />
                       </div>
-                      <h4 className="font-bold text-white text-sm mb-1">{product.name}</h4>
-                      <p className="text-gray-400 text-xs mb-2 line-clamp-2">{product.description}</p>
+                    ) : backendProducts.length > 0 ? (
+                      backendProducts.map((product) => (
+                    <div key={product.id} className="glass rounded-xl p-4 border border-gray-800 hover:border-red-500/30 transition-all">
+                          <div className="h-32 bg-gradient-to-br from-red-500/20 to-orange-500/20 rounded-lg mb-3 flex items-center justify-center relative overflow-hidden">
+                            {product.image_url?.[0] ? (
+                              <img src={product.image_url[0]} alt={product.name} className="w-full h-full object-cover" />
+                            ) : (
+                              <span className="text-5xl opacity-50">🌶️</span>
+                            )}
+                            {!product.in_stock && (
+                              <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                                <span className="text-white font-bold bg-red-500 px-3 py-1 rounded-full text-xs">SOLD OUT</span>
+                      </div>
+                            )}
+                          </div>
+                          <h4 className="font-bold text-white mb-1">{product.name}</h4>
+                          <p className="text-gray-400 text-xs mb-3 line-clamp-2">{product.description}</p>
                       <div className="flex items-center justify-between">
-                        <span className="text-lg font-bold text-red-400">${product.price.toFixed(2)}</span>
-                        <button className="px-3 py-1 bg-red-500 text-white text-xs rounded-lg hover:bg-red-600">
+                            <span className="text-xl font-bold text-red-400">${product.price_usd.toFixed(2)}</span>
+                            <button 
+                              onClick={() => addToCart(product)}
+                              disabled={!product.in_stock}
+                              className={`px-4 py-2 rounded-lg text-sm font-bold transition-colors ${
+                                product.in_stock 
+                                  ? 'bg-red-500 text-white hover:bg-red-600' 
+                                  : 'bg-gray-700 text-gray-500 cursor-not-allowed'
+                              }`}
+                            >
                           Add to Cart
+                            </button>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="col-span-full text-center py-12 glass rounded-xl">
+                        <p className="text-gray-400">No products available in this category yet.</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Shopping Cart / Checkout */}
+                <div className="space-y-6">
+                  <div className="glass rounded-2xl p-6 border border-red-500/20 sticky top-24">
+                    <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                      <ShoppingCart className="w-5 h-5 text-red-400" />
+                      Checkout
+                    </h3>
+
+                    {checkoutStep === 'cart' && (
+                      <div className="space-y-4">
+                        {cart.length > 0 ? (
+                          <>
+                            <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
+                              {cart.map((item) => (
+                                <div key={item.id} className="flex justify-between items-center py-2 border-b border-gray-800">
+                                  <div>
+                                    <p className="text-white font-medium text-sm">{item.name}</p>
+                                    <p className="text-xs text-gray-500">Qty: {item.quantity}</p>
+                                  </div>
+                                  <div className="text-right">
+                                    <p className="text-red-400 font-bold text-sm">${(item.price * item.quantity).toFixed(2)}</p>
+                                    <button 
+                                      onClick={() => removeFromCart(item.id)}
+                                      className="text-[10px] text-gray-500 hover:text-red-400 underline"
+                                    >
+                                      Remove
                         </button>
                       </div>
                     </div>
                   ))}
                 </div>
+                            <div className="pt-4 border-t border-gray-700">
+                              <div className="flex justify-between items-center mb-6">
+                                <span className="text-gray-400 font-medium">Total USD</span>
+                                <span className="text-2xl font-bold text-white">${cartTotal.toFixed(2)}</span>
+                              </div>
+                              <button 
+                                onClick={() => setCheckoutStep('address')}
+                                className="w-full py-3 bg-red-500 text-white font-bold rounded-xl hover:bg-red-600 transition-colors"
+                              >
+                                Continue to Shipping
+                              </button>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="text-center py-8">
+                            <Package className="w-12 h-12 text-gray-700 mx-auto mb-3" />
+                            <p className="text-gray-500 text-sm">Your cart is empty</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
 
-                {/* Merch Link */}
-                <div className="glass rounded-2xl p-6 text-center border border-red-500/20">
-                  <h3 className="text-xl font-bold text-white mb-2">Official IC SPICY Apparel</h3>
-                  <p className="text-gray-400 mb-4">T-shirts, hoodies, hats and more!</p>
-                  <a
-                    href={T3KNO_SHOP}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 px-6 py-3 bg-red-500 text-white font-bold rounded-xl hover:bg-red-600 transition-colors"
+                    {checkoutStep === 'address' && (
+                      <div className="space-y-4">
+                        <button 
+                          onClick={() => setCheckoutStep('cart')}
+                          className="text-xs text-red-400 mb-2 hover:underline"
+                        >
+                          ← Back to Cart
+                        </button>
+                        <div>
+                          <label className="block text-xs text-gray-400 mb-1">Shipping Address</label>
+                          <textarea 
+                            value={shippingAddress}
+                            onChange={(e) => setShippingAddress(e.target.value)}
+                            placeholder="Enter your full shipping address..."
+                            className="w-full bg-gray-800 border border-gray-700 rounded-xl p-3 text-white text-sm focus:border-red-500 outline-none h-32"
+                          />
+                        </div>
+                        <button 
+                          disabled={!shippingAddress.trim()}
+                          onClick={() => setCheckoutStep('payment')}
+                          className="w-full py-3 bg-red-500 text-white font-bold rounded-xl hover:bg-red-600 disabled:opacity-50"
+                        >
+                          Review & Pay
+                        </button>
+                      </div>
+                    )}
+
+                    {checkoutStep === 'payment' && (
+                      <div className="space-y-4">
+                        <button 
+                          onClick={() => setCheckoutStep('address')}
+                          className="text-xs text-red-400 mb-2 hover:underline"
+                        >
+                          ← Back to Shipping
+                        </button>
+                        <div className="p-4 bg-gray-800/50 rounded-xl border border-gray-700">
+                          <p className="text-xs text-gray-400 mb-2">Order Summary</p>
+                          <div className="flex justify-between text-sm mb-1">
+                            <span className="text-gray-300">Subtotal</span>
+                            <span className="text-white font-bold">${cartTotal.toFixed(2)}</span>
+                          </div>
+                          {hasOGDiscount && (
+                            <div className="flex justify-between text-sm mb-1 text-green-400">
+                              <span className="font-medium flex items-center gap-1">
+                                <Award className="w-3 h-3" /> OG Discount (20%)
+                              </span>
+                              <span className="font-bold">-${(cartTotal * 0.2).toFixed(2)}</span>
+                            </div>
+                          )}
+                          <div className="flex justify-between text-sm mb-1">
+                            <span className="text-gray-300">Shipping</span>
+                            <span className="text-white font-bold">$7.99</span>
+                          </div>
+                          <div className="pt-2 mt-2 border-t border-gray-700 flex justify-between font-bold">
+                            <span className="text-white">Total</span>
+                            <span className="text-red-400">
+                              ${(hasOGDiscount ? cartTotal * 0.8 + 7.99 : cartTotal + 7.99).toFixed(2)}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="p-3 bg-yellow-500/10 rounded-xl border border-yellow-500/20 flex gap-2">
+                          <AlertCircle className="w-4 h-4 text-yellow-500 flex-shrink-0" />
+                          <p className="text-[10px] text-yellow-200/70">
+                            Payments are processed via $HARLEE or ICP. You will be prompted to sign the transaction.
+                          </p>
+                        </div>
+                        <button 
+                          onClick={handleCheckout}
+                          disabled={isCheckingOut}
+                          className="w-full py-4 bg-gradient-to-r from-red-500 to-orange-500 text-white font-bold rounded-xl hover:shadow-lg hover:shadow-red-500/20 transition-all flex items-center justify-center gap-2"
                   >
-                    <ShoppingCart className="w-5 h-5" />
-                    Shop Apparel at T3kno-Logic
-                    <ExternalLink className="w-4 h-4" />
-                  </a>
+                          {isCheckingOut ? <Loader2 className="w-5 h-5 animate-spin" /> : <Flame className="w-5 h-5" />}
+                          PAY WITH CRYPTO
+                        </button>
+                      </div>
+                    )}
+
+                    {checkoutStep === 'success' && (
+                      <div className="text-center py-8 space-y-4">
+                        <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto">
+                          <CheckCircle2 className="w-10 h-10 text-green-400" />
+                        </div>
+                        <h4 className="text-xl font-bold text-white">Order Confirmed!</h4>
+                        <p className="text-gray-400 text-sm">
+                          Thank you for supporting our RWA pepper co-op. Your order ID is:
+                        </p>
+                        <code className="block p-2 bg-gray-800 rounded-lg text-red-400 text-xs">
+                          {orderId?.toString()}
+                        </code>
+                        <button 
+                          onClick={() => setCheckoutStep('cart')}
+                          className="w-full py-2 bg-gray-800 text-white text-sm rounded-lg hover:bg-gray-700"
+                        >
+                          Return to Shop
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
@@ -766,6 +1123,24 @@ export default function ICSpicyPage() {
                     </div>
                   </div>
 
+                  {isAuthenticated && (
+                    <div className="mb-8 p-6 bg-gradient-to-r from-amber-500/10 to-yellow-500/10 border border-amber-500/20 rounded-2xl">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                            <Award className="w-5 h-5 text-amber-400" />
+                            DAO Governance
+                          </h3>
+                          <p className="text-sm text-gray-400">Your current voting power based on NFT holdings</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-3xl font-bold text-amber-400">{votingPower.toString()}</p>
+                          <p className="text-[10px] text-gray-500 uppercase tracking-widest">Voting Weight</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Map Placeholder */}
                   <div className="bg-gray-800 rounded-xl h-64 flex items-center justify-center border border-gray-700">
                     <div className="text-center">
@@ -777,7 +1152,7 @@ export default function ICSpicyPage() {
                 </div>
 
                 {/* Inventory Control */}
-                <InventoryControl items={INVENTORY_ITEMS} />
+                <InventoryControl products={backendProducts} />
               </div>
             )}
 

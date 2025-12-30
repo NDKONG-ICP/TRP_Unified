@@ -31,8 +31,16 @@ export interface SIWBSession {
   expiresAt: bigint;
 }
 
+interface BackendSIWBSession {
+  session_id: string;
+  bitcoin_address: string;
+  principal: Principal;
+  created_at: bigint;
+  expires_at: bigint;
+}
+
 export interface SIWBVerifyResult {
-  Ok?: SIWBSession;
+  Ok?: BackendSIWBSession;
   Err?: string;
 }
 

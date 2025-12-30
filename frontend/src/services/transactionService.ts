@@ -85,7 +85,7 @@ export class TransactionService {
     
     try {
       const txs = await treasuryService.getTransactions(offset, limit);
-      return txs.map(tx => this.mapTreasuryTransaction(tx));
+      return txs.map((tx) => this.mapTreasuryTransaction(tx));
     } catch (error) {
       console.error('Failed to fetch treasury transactions:', error);
       throw error;
@@ -103,10 +103,10 @@ export class TransactionService {
     try {
       // Fetch from treasury
       const treasuryTxs = await treasuryService.getTransactions(0, limit);
-      const userTreasuryTxs = treasuryTxs.filter(tx => 
+      const userTreasuryTxs = treasuryTxs.filter((tx) =>
         tx.from === principal || tx.to === principal
       );
-      transactions.push(...userTreasuryTxs.map(tx => this.mapTreasuryTransaction(tx)));
+      transactions.push(...userTreasuryTxs.map((tx) => this.mapTreasuryTransaction(tx)));
     } catch (error) {
       console.warn('Failed to fetch treasury transactions:', error);
     }
@@ -127,7 +127,7 @@ export class TransactionService {
     const numId = parseInt(txId);
     if (!isNaN(numId)) {
       const txs = await treasuryService.getTransactions(0, 100);
-      const tx = txs.find(t => t.id === numId);
+      const tx = txs.find((t) => Number(t.id) === numId);
       if (tx) {
         return this.mapTreasuryTransaction(tx);
       }

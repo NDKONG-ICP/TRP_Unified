@@ -386,67 +386,39 @@ Always be concise but informative. If you don't know something, say so honestly.
 
   /**
    * Generate AI response for a user message
-   * In production, this would call an LLM API (like OpenAI or local LLM)
-   * For now, we use intelligent pattern matching with context
+   * Calls the real raven_ai canister for on-chain AI processing
    */
   async generateResponse(
     userMessage: string, 
     tokenId?: bigint,
     conversationHistory: Array<{ role: string; content: string; timestamp: number | bigint }> = []
   ): Promise<string> {
-    // Get relevant memories if we have an agent
-    let context = '';
-    if (tokenId) {
-      const memories = await this.ravenAIService.recallMemories(tokenId, userMessage, 5);
-      if (memories.length > 0) {
-        context = memories.map(m => m.content).join('\n');
+    try {
+      const actor = await this.ravenAIService.getActor();
+      const result = await actor.chat(
+        tokenId ? [tokenId] : [],
+        userMessage,
+        [] // system_prompt optional
+      );
+
+      if ('Ok' in result) {
+        return result.Ok;
+      } else {
+        throw new Error(result.Err);
       }
-    }
-
-    // Build conversation context
-    const recentHistory = conversationHistory.slice(-6).map(m => 
-      `${m.role}: ${m.content}`
-    ).join('\n');
-
-    // Get conversation key for tracking responses
-    const conversationKey = tokenId ? `agent-${tokenId}` : 'demo';
-    const recentResponses = this.recentResponses.get(conversationKey) || [];
-    
-    // Generate response based on patterns and context
-    let response = this.generateContextualResponse(userMessage, context, recentHistory, recentResponses);
-    
-    // Ensure we don't repeat the same response
-    let attempts = 0;
-    while (recentResponses.includes(response) && attempts < 5) {
-      response = this.generateContextualResponse(userMessage, context, recentHistory, recentResponses);
-      attempts++;
-    }
-    
-    // Track this response (keep last 5)
-    recentResponses.push(response);
-    if (recentResponses.length > 5) {
-      recentResponses.shift();
-    }
-    this.recentResponses.set(conversationKey, recentResponses);
-
-    // Store the interaction if we have an agent
-    if (tokenId) {
-      await this.ravenAIService.addChatMessage(tokenId, 'user', userMessage);
-      await this.ravenAIService.addChatMessage(tokenId, 'assistant', response);
+    } catch (error) {
+      console.error('Failed to generate real AI response, using contextual engine:', error);
       
-      // Store important information as memories
-      if (this.shouldRemember(userMessage)) {
-        await this.ravenAIService.addMemory(
-          tokenId,
-          `User mentioned: ${userMessage}`,
-          'short_term',
-          0.6,
-          this.extractTags(userMessage)
-        );
-      }
+      // Fallback to contextual engine if canister call fails
+      const context = '';
+      const recentHistory = conversationHistory.slice(-6).map(m => 
+        `${m.role}: ${m.content}`
+      ).join('\n');
+      const conversationKey = tokenId ? `agent-${tokenId}` : 'demo';
+      const recentResponses = this.recentResponses.get(conversationKey) || [];
+      
+      return this.generateContextualResponse(userMessage, context, recentHistory, recentResponses);
     }
-
-    return response;
   }
 
   private generateContextualResponse(userMessage: string, context: string, history: string, recentResponses: string[] = []): string {

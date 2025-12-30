@@ -6,10 +6,7 @@
 import { Actor, HttpAgent, Identity } from '@dfinity/agent';
 import { Principal } from '@dfinity/principal';
 import { IDL } from '@dfinity/candid';
-import { getICHost, isMainnet } from './canisterConfig';
-
-// Staking canister ID from mainnet
-const STAKING_CANISTER_ID = 'inutw-jiaaa-aaaao-a4yja-cai';
+import { getCanisterId, getICHost, isMainnet } from './canisterConfig';
 
 // Types matching the backend
 export interface StakedNFT {
@@ -74,9 +71,10 @@ async function createStakingActor(identity: Identity | null): Promise<any> {
     await agent.fetchRootKey();
   }
 
+  const canisterId = getCanisterId('staking');
   return Actor.createActor(stakingIdlFactory, {
     agent,
-    canisterId: STAKING_CANISTER_ID,
+    canisterId: Principal.fromText(canisterId),
   });
 }
 

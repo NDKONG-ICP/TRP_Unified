@@ -73,6 +73,9 @@ service : {
     accept_bid: (text) -> (variant { Ok: Load; Err: text });
     update_load_status: (text, LoadStatus) -> (variant { Ok: Load; Err: text });
     
+    // Admin
+    update_config: (opt nat16, opt principal, opt principal) -> (variant { Ok; Err: text });
+
     // Queries
     get_load: (text) -> (opt Load) query;
     get_available_loads: () -> (vec Load) query;
@@ -83,9 +86,3 @@ service : {
     get_config: () -> (LogisticsConfig) query;
     health: () -> (text) query;
 }
-
-
-
-
-
-

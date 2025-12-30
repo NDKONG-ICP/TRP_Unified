@@ -172,11 +172,9 @@ thread_local! {
 }
 
 // Admin principal
-const ADMIN_PRINCIPAL: &str = "lgd5r-y4x7q-lbrfa-mabgw-xurgu-4h3at-sw4sl-yyr3k-5kwgt-vlkao-jae";
-
 fn is_admin(caller: Principal) -> bool {
     CONFIG.with(|c| c.borrow().get().admin == caller)
-        || caller.to_text() == ADMIN_PRINCIPAL
+        || ic_cdk::api::is_controller(&caller)
 }
 
 fn generate_escrow_id(shipper: Principal, load_id: &str) -> String {
@@ -195,18 +193,13 @@ fn generate_qr_code(escrow_id: &str, qr_type: &str) -> String {
     format!("QR-{}-{}", qr_type.to_uppercase(), &hex::encode(hasher.finalize())[..16])
 }
 
-// Initialization
 #[init]
 fn init() {
     let caller = ic_cdk::caller();
     
     CONFIG.with(|c| {
         let mut config = c.borrow().get().clone();
-        config.admin = if caller != Principal::anonymous() {
-            caller
-        } else {
-            Principal::from_text(ADMIN_PRINCIPAL).unwrap()
-        };
+        config.admin = caller;
         c.borrow_mut().set(config).unwrap();
     });
 }

@@ -5,8 +5,8 @@
 
 import { Actor, HttpAgent, Identity } from '@dfinity/agent';
 import { Principal } from '@dfinity/principal';
-import { AuthClient } from '@dfinity/auth-client';
 import { getCanisterId, getICHost, isMainnet } from './canisterConfig';
+import { getActiveIdentity, getOrCreateAgent } from './session';
 
 // ============ TYPES ============
 
@@ -122,18 +122,9 @@ class LogisticsService {
 
   private async ensureActor() {
     if (!this.actor) {
-      const authClient = await AuthClient.create();
-      const identity = authClient.getIdentity();
+      const identity = getActiveIdentity();
       this.identity = identity;
-
-      const agent = new HttpAgent({
-        identity,
-        host: getICHost(),
-      });
-
-      if (!isMainnet()) {
-        await agent.fetchRootKey();
-      }
+      const agent = await getOrCreateAgent(identity);
 
       const canisterId = getCanisterId('logistics');
       this.actor = Actor.createActor(logisticsIdlFactory, {

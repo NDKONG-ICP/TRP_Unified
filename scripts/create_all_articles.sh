@@ -5,10 +5,12 @@
 
 set -euo pipefail
 
-export DFX_WARNING=-mainnet_plaintext_identity
+PROJECT_ROOT="/Users/williambeck/The Forge NFT Minter/raven-unified-ecosystem"
+cd "$PROJECT_ROOT"
+source "./scripts/dfx_safe_env.sh"
 
 NETWORK="ic"
-RAVEN_AI_CANISTER="3noas-jyaaa-aaaao-a4xda-cai"
+RAVEN_AI_CANISTER="raven_ai"
 ARTICLES_FILE="scripts/articles_data.json"
 
 echo "=========================================="
@@ -58,17 +60,14 @@ for i in $(seq 0 $((TOTAL_ARTICLES - 1))); do
     EXCERPT=$(cat "$ARTICLES_FILE" | jq -r ".[$i].excerpt")
     CONTENT=$(cat "$ARTICLES_FILE" | jq -r ".[$i].content")
     CATEGORY=$(cat "$ARTICLES_FILE" | jq -r ".[$i].category")
-    TAGS=$(cat "$ARTICLES_FILE" | jq -c ".[$i].tags")
+    TAGS=$(cat "$ARTICLES_FILE" | jq -r ".[$i].tags | if length==0 then \"vec {}\" else \"vec { \" + (map(\"\\\"\" + . + \"\\\"\") | join(\"; \")) + \" }\" end")
     SEO_TITLE=$(cat "$ARTICLES_FILE" | jq -r ".[$i].seoTitle")
     SEO_DESC=$(cat "$ARTICLES_FILE" | jq -r ".[$i].seoDescription")
-    SEO_KEYWORDS=$(cat "$ARTICLES_FILE" | jq -c ".[$i].seoKeywords")
+    SEO_KEYWORDS=$(cat "$ARTICLES_FILE" | jq -r ".[$i].seoKeywords | if length==0 then \"vec {}\" else \"vec { \" + (map(\"\\\"\" + . + \"\\\"\" ) | join(\"; \")) + \" }\" end")
     FEATURED=$(cat "$ARTICLES_FILE" | jq -r ".[$i].featured")
     
     # Convert persona
     PERSONA_VARIANT=$(convert_persona "$PERSONA")
-    
-    # Escape content for shell (replace newlines with \n and quotes)
-    CONTENT_ESCAPED=$(echo "$CONTENT" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
     
     # Build the dfx command with proper escaping
     # Use a temporary file for the content to avoid shell escaping issues
@@ -76,7 +75,10 @@ for i in $(seq 0 $((TOTAL_ARTICLES - 1))); do
     echo "$CONTENT" > "$TEMP_FILE"
     
     # Call dfx canister call with file input for content
-    if dfx canister call --network "$NETWORK" "$RAVEN_AI_CANISTER" create_article "(
+    # Important: do NOT pipe to grep -q (it can look like a hang with no logs).
+    # Capture output and show it on failure for fast debugging.
+    set +e
+    OUT="$(./scripts/dfx_safe.sh canister call --network "$NETWORK" "$RAVEN_AI_CANISTER" create_article "(
         \"$TITLE\",
         \"$SLUG\",
         \"$EXCERPT\",
@@ -88,11 +90,15 @@ for i in $(seq 0 $((TOTAL_ARTICLES - 1))); do
         \"$SEO_DESC\",
         $SEO_KEYWORDS,
         $FEATURED
-    )" 2>&1 | grep -q "Ok\|ok"; then
+    )" 2>&1)"
+    RC=$?
+    set -e
+    if [ "$RC" -eq 0 ] && echo "$OUT" | grep -Eq "Ok\\s*=\\s*record"; then
         echo "✅ Article $((i + 1)) created: $TITLE"
         ((SUCCESS++))
     else
         echo "❌ Failed to create article $((i + 1)): $TITLE"
+        echo "$OUT" | tail -n 30
         ((FAILED++))
     fi
     

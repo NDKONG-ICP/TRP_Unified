@@ -11,7 +11,7 @@ echo ""
 echo "🔄 Assigning multichain metadata to AXIOM #1..."
 env -i HOME="$HOME" PATH="$PATH" DFX_WARNING="-mainnet_plaintext_identity" \
 dfx canister --network ic call axiom_1 update_multichain_metadata \
-  '(opt "0x989847D46770e2322b017c79e2fAF253aA23687f", opt "1", opt 1 : nat64, null, null, opt "6NgxMDwKYfqdtBVpbkA3LmCHzXS5CZ8DvQX72KpDZ5A4", null, opt "bc1qxf5fegu3x4uvynqz69q62jcglzg3m8jpzrsdej", null, null, null, null, null, null, opt "Chain Fusion", opt "3rk2d-6yaaa-aaaao-a4xba-cai")' \
+  '(opt "REPLACE_WITH_ETH_ADDRESS", opt "1", opt 1 : nat64, null, null, opt "REPLACE_WITH_SOL_ADDRESS", null, opt "REPLACE_WITH_BTC_ADDRESS", null, null, null, null, null, null, opt "Chain Fusion", opt "3rk2d-6yaaa-aaaao-a4xba-cai")' \
   > /tmp/axiom_1_metadata.log 2>&1 &
 PID1=$!
 
@@ -19,7 +19,7 @@ PID1=$!
 echo "🔄 Assigning multichain metadata to AXIOM #2..."
 env -i HOME="$HOME" PATH="$PATH" DFX_WARNING="-mainnet_plaintext_identity" \
 dfx canister --network ic call axiom_2 update_multichain_metadata \
-  '(opt "0x989847D46770e2322b017c79e2fAF253aA23687f", opt "2", opt 1 : nat64, null, null, opt "6NgxMDwKYfqdtBVpbkA3LmCHzXS5CZ8DvQX72KpDZ5A4", null, opt "bc1qxf5fegu3x4uvynqz69q62jcglzg3m8jpzrsdej", null, null, null, null, null, null, opt "Chain Fusion", opt "3rk2d-6yaaa-aaaao-a4xba-cai")' \
+  '(opt "REPLACE_WITH_ETH_ADDRESS", opt "2", opt 1 : nat64, null, null, opt "REPLACE_WITH_SOL_ADDRESS", null, opt "REPLACE_WITH_BTC_ADDRESS", null, null, null, null, null, null, opt "Chain Fusion", opt "3rk2d-6yaaa-aaaao-a4xba-cai")' \
   > /tmp/axiom_2_metadata.log 2>&1 &
 PID2=$!
 
@@ -27,7 +27,7 @@ PID2=$!
 echo "🔄 Assigning multichain metadata to AXIOM #3..."
 env -i HOME="$HOME" PATH="$PATH" DFX_WARNING="-mainnet_plaintext_identity" \
 dfx canister --network ic call axiom_3 update_multichain_metadata \
-  '(opt "0x989847D46770e2322b017c79e2fAF253aA23687f", opt "3", opt 1 : nat64, null, null, opt "6NgxMDwKYfqdtBVpbkA3LmCHzXS5CZ8DvQX72KpDZ5A4", null, opt "bc1qxf5fegu3x4uvynqz69q62jcglzg3m8jpzrsdej", null, null, null, null, null, null, opt "Chain Fusion", opt "3rk2d-6yaaa-aaaao-a4xba-cai")' \
+  '(opt "REPLACE_WITH_ETH_ADDRESS", opt "3", opt 1 : nat64, null, null, opt "REPLACE_WITH_SOL_ADDRESS", null, opt "REPLACE_WITH_BTC_ADDRESS", null, null, null, null, null, null, opt "Chain Fusion", opt "3rk2d-6yaaa-aaaao-a4xba-cai")' \
   > /tmp/axiom_3_metadata.log 2>&1 &
 PID3=$!
 
@@ -35,7 +35,7 @@ PID3=$!
 echo "🔄 Assigning multichain metadata to AXIOM #4..."
 env -i HOME="$HOME" PATH="$PATH" DFX_WARNING="-mainnet_plaintext_identity" \
 dfx canister --network ic call axiom_4 update_multichain_metadata \
-  '(opt "0x989847D46770e2322b017c79e2fAF253aA23687f", opt "4", opt 1 : nat64, null, null, opt "6NgxMDwKYfqdtBVpbkA3LmCHzXS5CZ8DvQX72KpDZ5A4", null, opt "bc1qxf5fegu3x4uvynqz69q62jcglzg3m8jpzrsdej", null, null, null, null, null, null, opt "Chain Fusion", opt "3rk2d-6yaaa-aaaao-a4xba-cai")' \
+  '(opt "REPLACE_WITH_ETH_ADDRESS", opt "4", opt 1 : nat64, null, null, opt "REPLACE_WITH_SOL_ADDRESS", null, opt "REPLACE_WITH_BTC_ADDRESS", null, null, null, null, null, null, opt "Chain Fusion", opt "3rk2d-6yaaa-aaaao-a4xba-cai")' \
   > /tmp/axiom_4_metadata.log 2>&1 &
 PID4=$!
 
@@ -43,7 +43,7 @@ PID4=$!
 echo "🔄 Assigning multichain metadata to AXIOM #5..."
 env -i HOME="$HOME" PATH="$PATH" DFX_WARNING="-mainnet_plaintext_identity" \
 dfx canister --network ic call axiom_5 update_multichain_metadata \
-  '(opt "0x989847D46770e2322b017c79e2fAF253aA23687f", opt "5", opt 1 : nat64, null, null, opt "6NgxMDwKYfqdtBVpbkA3LmCHzXS5CZ8DvQX72KpDZ5A4", null, opt "bc1qxf5fegu3x4uvynqz69q62jcglzg3m8jpzrsdej", null, null, null, null, null, null, opt "Chain Fusion", opt "3rk2d-6yaaa-aaaao-a4xba-cai")' \
+  '(opt "REPLACE_WITH_ETH_ADDRESS", opt "5", opt 1 : nat64, null, null, opt "REPLACE_WITH_SOL_ADDRESS", null, opt "REPLACE_WITH_BTC_ADDRESS", null, null, null, null, null, null, opt "Chain Fusion", opt "3rk2d-6yaaa-aaaao-a4xba-cai")' \
   > /tmp/axiom_5_metadata.log 2>&1 &
 PID5=$!
 

@@ -1,0 +1,20 @@
+[
+  {
+    "match": "**/*",
+    "headers": {
+      "Cache-Control": "public, max-age=31536000, immutable"
+    },
+    "disable_security_policy_warning": true
+  },
+  {
+    "match": "*.html",
+    "headers": {
+      "Cache-Control": "no-cache"
+    }
+  },
+  {
+    "match": "index.html",
+    "allow_raw_access": true
+  }
+]
+

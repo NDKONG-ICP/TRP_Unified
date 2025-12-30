@@ -169,13 +169,9 @@ thread_local! {
 const RATE_LIMIT_WINDOW: u64 = 60_000_000_000; // 1 minute in nanoseconds
 const MAX_REQUESTS_PER_WINDOW: u32 = 100;
 
-// Admin principal (your principal)
-const ADMIN_PRINCIPAL: &str = "lgd5r-y4x7q-lbrfa-mabgw-xurgu-4h3at-sw4sl-yyr3k-5kwgt-vlkao-jae";
-
-// Helper functions
 fn is_admin(caller: Principal) -> bool {
     CONFIG.with(|c| c.borrow().get().admin_principal == caller)
-        || caller.to_text() == ADMIN_PRINCIPAL
+        || ic_cdk::api::is_controller(&caller)
 }
 
 fn check_rate_limit(caller: Principal) -> Result<(), String> {
@@ -223,11 +219,7 @@ fn init() {
     // Set initial admin
     CONFIG.with(|c| {
         let mut config = c.borrow().get().clone();
-        config.admin_principal = if caller != Principal::anonymous() {
-            caller
-        } else {
-            Principal::from_text(ADMIN_PRINCIPAL).unwrap()
-        };
+        config.admin_principal = caller;
         c.borrow_mut().set(config).unwrap();
     });
 

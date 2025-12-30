@@ -3,6 +3,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, X, Wallet, User, LogOut, ChevronDown, Shield } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { ConnectWallet } from "@nfid/identitykit/react";
 import { useAuthStore } from '../../stores/authStore';
 import LanguageSelector from './LanguageSelector';
 import AccessibilityMenu from './AccessibilityMenu';
@@ -33,7 +34,8 @@ export default function Header() {
     logout, 
     principal,
     balances,
-    profile 
+    profile,
+    isAdmin
   } = useAuthStore();
 
   useEffect(() => {
@@ -62,19 +64,6 @@ export default function Header() {
     const num = Number(balance) / Math.pow(10, decimals);
     return num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 });
   };
-  
-  // Check if user is admin
-  const isAdmin = principal ? (() => {
-    const principalText = principal.toText();
-    const adminPrincipals = [
-      'lgd5r-y4x7q-lbrfa-mabgw-xurgu-4h3at-sw4sl-yyr3k-5kwgt-vlkao-jae', // Cursor
-      'sh7h6-b7xcy-tjank-crj6d-idrcr-ormbi-22yqs-uanyl-itbp3-ur5ue-wae', // Plug
-      'yyirv-5pjkg-oupac-gzja4-ljzfn-6mvon-r5w2i-6e7wm-sde75-wuses-nqe', // OISY
-      'imnyd-k37s2-xlg7c-omeed-ezrzg-6oesa-r3ek6-xrwuz-qbliq-5h675-yae', // New
-      'gqkko-43bbx-nwsp4-it2rg-pc2dy-w2pt2-fa5om-4y6es-oyhz2-5i5oh-5ae', // DFX
-    ];
-    return adminPrincipals.includes(principalText) || adminPrincipals.some(admin => principalText.startsWith(admin.split('-')[0]));
-  })() : false;
 
   return (
     <header 
@@ -154,111 +143,9 @@ export default function Header() {
             )}
             
             {/* Wallet Button */}
-            {isAuthenticated ? (
-              <div className="relative">
-                <button
-                  onClick={() => setIsWalletOpen(!isWalletOpen)}
-                  className="flex items-center space-x-1.5 sm:space-x-2 px-2 sm:px-3 py-1.5 sm:py-2 glass-gold rounded-lg hover:border-gold-400 transition-all whitespace-nowrap"
-                >
-                  <Wallet className="w-4 h-4 sm:w-5 sm:h-5 text-gold-400 flex-shrink-0" />
-                  <span className="hidden lg:inline text-xs sm:text-sm font-medium text-gold-300">
-                    {formatBalance(balances.icp)} ICP
-                  </span>
-                  <ChevronDown className={`w-3 h-3 sm:w-4 sm:h-4 text-gold-400 transition-transform flex-shrink-0 ${isWalletOpen ? 'rotate-180' : ''}`} />
-                </button>
-
-                <AnimatePresence>
-                  {isWalletOpen && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                      animate={{ opacity: 1, y: 0, scale: 1 }}
-                      exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                      className="absolute right-0 mt-2 w-72 glass-dark rounded-2xl p-4 border border-gold-500/30 z-50"
-                    >
-                      {/* Principal */}
-                      <div className="mb-4 pb-4 border-b border-gold-700/30">
-                        <p className="text-xs text-silver-500 mb-1">{t('common.principalId')}</p>
-                        <p className="text-sm font-mono text-gold-300 truncate">
-                          {principal?.toText()}
-                        </p>
-                      </div>
-
-                      {/* Balances */}
-                      <div className="space-y-3 mb-4">
-                        <p className="text-xs text-silver-500 font-semibold uppercase tracking-wider">{t('common.balances')}</p>
-                        <div className="grid gap-2">
-                          <div className="flex justify-between items-center">
-                            <span className="text-silver-400">ICP</span>
-                            <span className="text-gold-300 font-medium">{formatBalance(balances.icp)}</span>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-silver-400">ckBTC</span>
-                            <span className="text-gold-300 font-medium">{formatBalance(balances.ckBTC)}</span>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-silver-400">ckETH</span>
-                            <span className="text-gold-300 font-medium">{formatBalance(balances.ckETH, 18)}</span>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-silver-400">ckUSDC</span>
-                            <span className="text-gold-300 font-medium">{formatBalance(balances.ckUSDC, 6)}</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Actions */}
-                      <div className="space-y-2">
-                        {isAdmin && (
-                          <Link
-                            to="/admin"
-                            className="flex items-center justify-center w-full py-2 px-4 bg-amber-500/20 hover:bg-amber-500/30 text-amber-400 rounded-lg transition-all mb-2"
-                            onClick={() => setIsWalletOpen(false)}
-                          >
-                            <Shield className="w-4 h-4 mr-2" />
-                            Admin Panel
-                          </Link>
-                        )}
-                        <Link
-                          to="/wallet"
-                          className="flex items-center justify-center w-full py-2 px-4 bg-gold-500/20 hover:bg-gold-500/30 text-gold-400 rounded-lg transition-all"
-                          onClick={() => setIsWalletOpen(false)}
-                        >
-                          <Wallet className="w-4 h-4 mr-2" />
-                          {t('common.viewWallet')}
-                        </Link>
-                        <Link
-                          to="/profile"
-                          className="flex items-center justify-center w-full py-2 px-4 hover:bg-silver-500/10 text-silver-400 rounded-lg transition-all"
-                          onClick={() => setIsWalletOpen(false)}
-                        >
-                          <User className="w-4 h-4 mr-2" />
-                          {t('common.profile')}
-                        </Link>
-                        <button
-                          onClick={() => {
-                            logout();
-                            setIsWalletOpen(false);
-                          }}
-                          className="flex items-center justify-center w-full py-2 px-4 hover:bg-red-500/10 text-red-400 rounded-lg transition-all"
-                        >
-                          <LogOut className="w-4 h-4 mr-2" />
-                          {t('common.disconnect')}
-                        </button>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
-            ) : (
-              <button
-                onClick={() => setIsWalletModalOpen(true)}
-                disabled={isLoading}
-                className="btn-gold flex items-center space-x-2 px-3 sm:px-4 py-1.5 sm:py-2 text-sm"
-              >
-                <Wallet className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span className="hidden sm:inline">{isLoading ? t('common.connecting') : t('common.connect')}</span>
-              </button>
-            )}
+            <div className="relative">
+              <ConnectWallet />
+            </div>
 
             {/* Wallet Connection Modal */}
             <WalletModal 

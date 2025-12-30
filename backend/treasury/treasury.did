@@ -122,9 +122,14 @@ service : {
     fetch_harlee_balance: () -> (variant { Ok: nat64; Err: text });
     fetch_icp_balance: () -> (variant { Ok: nat64; Err: text });
     fetch_all_balances: () -> (variant { Ok: TreasuryBalance; Err: text });
+    sync_token_balance: (TokenType) -> (variant { Ok: nat64; Err: text });
     transfer_harlee: (principal, nat64, opt text) -> (variant { Ok: nat64; Err: text });
     distribute_staking_reward: (principal, nat64, nat32) -> (variant { Ok: nat64; Err: text });
     
+    // Payment & Swap
+    process_nft_payment: (TokenType, nat64, nat64, opt text) -> (variant { Ok: nat64; Err: text });
+    auto_swap_to_icp: (TokenType, nat64) -> (variant { Ok: nat64; Err: text });
+
     // Query functions
     get_balance: () -> (TreasuryBalance) query;
     get_token_balance_query: (TokenType) -> (nat64) query;

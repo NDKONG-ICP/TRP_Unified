@@ -85,98 +85,6 @@ interface UserStats {
   nftBadges: string[];
 }
 
-// Sample AI-Generated Puzzle Data
-const generateCryptoPuzzle = (): PuzzleData => {
-  const grid: CrosswordCell[][] = Array(10).fill(null).map(() =>
-    Array(10).fill(null).map(() => ({
-      letter: '',
-      userInput: '',
-      isBlocked: Math.random() > 0.75,
-    }))
-  );
-
-  // Place words
-  const words = [
-    { word: 'BITCOIN', row: 0, col: 1, dir: 'across' },
-    { word: 'ETHEREUM', row: 2, col: 0, dir: 'across' },
-    { word: 'BLOCKCHAIN', row: 4, col: 0, dir: 'across' },
-    { word: 'TOKEN', row: 6, col: 3, dir: 'across' },
-    { word: 'WALLET', row: 8, col: 2, dir: 'across' },
-    { word: 'DEFI', row: 0, col: 1, dir: 'down' },
-    { word: 'NFT', row: 0, col: 5, dir: 'down' },
-    { word: 'STAKE', row: 2, col: 3, dir: 'down' },
-    { word: 'MINING', row: 4, col: 7, dir: 'down' },
-  ];
-
-  let clueNumber = 1;
-  const acrossClues: CrosswordClue[] = [];
-  const downClues: CrosswordClue[] = [];
-
-  words.forEach(({ word, row, col, dir }) => {
-    for (let i = 0; i < word.length; i++) {
-      const r = dir === 'across' ? row : row + i;
-      const c = dir === 'across' ? col + i : col;
-      if (r < 10 && c < 10) {
-        grid[r][c] = {
-          letter: word[i],
-          userInput: '',
-          isBlocked: false,
-          number: i === 0 ? clueNumber : undefined,
-        };
-      }
-    }
-
-    const clue: CrosswordClue = {
-      number: clueNumber,
-      direction: dir as 'across' | 'down',
-      clue: getClueForWord(word),
-      answer: word,
-      aiGenerated: true,
-      difficulty: word.length > 6 ? 'hard' : word.length > 4 ? 'medium' : 'easy',
-    };
-
-    if (dir === 'across') {
-      acrossClues.push(clue);
-    } else {
-      downClues.push(clue);
-    }
-    clueNumber++;
-  });
-
-  // Difficulty-based $HARLEE rewards
-  const baseHarlee = BigInt(50_000_000); // 0.5 $HARLEE base
-
-  return {
-    id: `puzzle-${Date.now()}`,
-    title: 'Crypto Knowledge Quest',
-    theme: 'Cryptocurrency & Blockchain',
-    grid,
-    clues: { across: acrossClues, down: downClues },
-    difficulty: 'medium',
-    aiGenerated: true,
-    rewards: { 
-      harlee: baseHarlee, 
-      xp: 100, 
-      nftChance: 0.1 
-    },
-  };
-};
-
-const getClueForWord = (word: string): string => {
-  const clues: Record<string, string> = {
-    'BITCOIN': 'The first and most famous cryptocurrency (7)',
-    'ETHEREUM': 'Blockchain platform known for smart contracts (8)',
-    'BLOCKCHAIN': 'Distributed ledger technology (10)',
-    'TOKEN': 'Digital asset on a blockchain (5)',
-    'WALLET': 'Where you store your crypto (6)',
-    'DEFI': 'Decentralized Finance, abbreviated (4)',
-    'NFT': 'Non-Fungible Token, abbreviated (3)',
-    'STAKE': 'Lock tokens to earn rewards (5)',
-    'MINING': 'Process of validating transactions (6)',
-  };
-  return clues[word] || `Word with ${word.length} letters`;
-};
-
 // AI Verification Component
 function AIVerification({ 
   isVerifying, 
@@ -543,11 +451,8 @@ export default function CrosswordPage() {
       setLastReward(undefined);
     } catch (error) {
       console.error('Failed to generate puzzle:', error);
-      // Fallback to local generation
-      const newPuzzle = generateCryptoPuzzle();
-      setPuzzle(newPuzzle);
-      setTimer(0);
-      setIsPlaying(true);
+      // No fallback to simulated data
+      alert('Failed to generate puzzle via AI. Please check your connection and try again.');
     } finally {
       setIsGenerating(false);
     }
@@ -660,7 +565,7 @@ export default function CrosswordPage() {
                 crosswords_solved: 1,
                 harlee_earned: Number(finalReward > BigInt(0) ? finalReward : result.harleeReward),
               },
-              identity
+              identity || undefined
             );
           } catch (error) {
             console.error('Failed to update KIP stats:', error);

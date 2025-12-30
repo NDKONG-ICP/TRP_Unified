@@ -6,10 +6,12 @@
  * - Eleven Labs voice synthesis & playback
  * - Conversational RavenAI Companion personality
  * - Works with main app and AXIOM NFTs
+ * - Demo mode with animated UI for unauthenticated users
  */
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 import {
   MessageCircle,
   Send,
@@ -30,9 +32,23 @@ import {
   Trash2,
   Settings,
   ChevronDown,
+  Wallet,
 } from 'lucide-react';
 import { useRavenAICompanion } from '../hooks/useRavenAICompanion';
 import { CompanionMessage } from '../services/ravenAICompanion';
+import { useWalletStore } from '../stores/walletStore';
+import {
+  useDemoMode,
+  DemoBadge,
+  ParticleBackground,
+  AICouncilVisualization,
+  CouncilThinkingIndicator,
+  SpeakingIndicator,
+  ListeningIndicator,
+  DemoRateLimitModal,
+  DemoSoftPrompt,
+  EcosystemShowcase,
+} from './DemoMode';
 
 // ============================================================================
 // Types
@@ -147,15 +163,34 @@ export const RavenAIChatbot: React.FC<RavenAIChatbotProps> = ({
   floating = true,
   onClose,
 }) => {
+  const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(initialOpen);
   const [isMinimized, setIsMinimized] = useState(false);
   const [input, setInput] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showCouncilViz, setShowCouncilViz] = useState(false);
+  const [dismissedSoftPrompt, setDismissedSoftPrompt] = useState(false);
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const recognitionRef = useRef<any>(null);
+  
+  // Demo mode context
+  const {
+    isDemoMode,
+    messagesRemaining,
+    isLimitReached,
+    isRateLimitModalOpen,
+    isEcosystemShowcaseOpen,
+    showWalletPrompt,
+    recordDemoMessage,
+    hideRateLimitModal,
+    hideEcosystemShowcase,
+  } = useDemoMode();
+  
+  // Wallet connection - get the connect function from wallet store
+  const walletConnect = useWalletStore((state) => state.connect);
   
   // Initialize companion with agent-specific config
   const config = agentId 
@@ -174,6 +209,31 @@ export const RavenAIChatbot: React.FC<RavenAIChatbotProps> = ({
     voiceEnabled,
     setVoiceEnabled,
   } = useRavenAICompanion(config);
+  
+  // Show AI Council visualization when loading in demo mode
+  useEffect(() => {
+    if (isLoading && isDemoMode) {
+      setShowCouncilViz(true);
+    }
+  }, [isLoading, isDemoMode]);
+  
+  // Handle connect wallet (for demo modal)
+  // Opens the wallet connection flow with Internet Identity as default
+  const handleConnectWallet = useCallback(async () => {
+    hideRateLimitModal();
+    try {
+      await walletConnect('internet-identity');
+    } catch (error) {
+      console.error('Wallet connection failed:', error);
+    }
+  }, [hideRateLimitModal, walletConnect]);
+  
+  // Handle navigation from ecosystem showcase
+  const handleEcosystemNavigate = useCallback((route: string) => {
+    hideEcosystemShowcase();
+    setIsOpen(false);
+    navigate(route);
+  }, [hideEcosystemShowcase, navigate]);
   
   // Auto-scroll to bottom
   useEffect(() => {
@@ -213,10 +273,22 @@ export const RavenAIChatbot: React.FC<RavenAIChatbotProps> = ({
   const handleSend = useCallback(async () => {
     if (!input.trim() || isLoading) return;
     
+    // Check demo rate limit before sending
+    if (isDemoMode && isLimitReached) {
+      return;
+    }
+    
     const message = input.trim();
     setInput('');
+    
+    // Record demo message usage
+    if (isDemoMode) {
+      recordDemoMessage();
+    }
+    
     await sendMessage(message);
-  }, [input, isLoading, sendMessage]);
+    setShowCouncilViz(false);
+  }, [input, isLoading, sendMessage, isDemoMode, isLimitReached, recordDemoMessage]);
   
   // Handle key press
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -257,9 +329,16 @@ export const RavenAIChatbot: React.FC<RavenAIChatbotProps> = ({
   }
   
   const chatContent = (
-    <div className={`flex flex-col h-full ${isMinimized ? 'h-14' : ''}`}>
+    <div className={`flex flex-col h-full ${isMinimized ? 'h-14' : ''} relative`}>
+      {/* Particle Background for Demo Mode */}
+      {isDemoMode && !isMinimized && (
+        <div className="absolute inset-0 pointer-events-none z-0">
+          <ParticleBackground intensity="subtle" particleCount={10} />
+        </div>
+      )}
+      
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-raven-900 via-raven-800 to-raven-900 border-b border-gold-500/30">
+      <div className="relative z-10 flex items-center justify-between px-4 py-3 bg-gradient-to-r from-raven-900 via-raven-800 to-raven-900 border-b border-gold-500/30">
         <div className="flex items-center gap-3">
           <div className="relative">
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gold-400 to-amber-600 flex items-center justify-center">
@@ -357,9 +436,16 @@ export const RavenAIChatbot: React.FC<RavenAIChatbotProps> = ({
         )}
       </AnimatePresence>
       
+      {/* Demo Badge */}
+      {isDemoMode && !isMinimized && (
+        <div className="relative z-10 px-4 py-2 bg-raven-900/80 border-b border-gold-500/20">
+          <DemoBadge />
+        </div>
+      )}
+      
       {/* Messages */}
       {!isMinimized && (
-        <div className="flex-1 overflow-y-auto p-4 space-y-2 bg-gradient-to-b from-raven-950 to-raven-900">
+        <div className="relative z-10 flex-1 overflow-y-auto p-4 space-y-2 bg-gradient-to-b from-raven-950/90 to-raven-900/90">
           {/* Welcome Message */}
           {messages.length === 0 && (
             <motion.div
@@ -412,26 +498,45 @@ export const RavenAIChatbot: React.FC<RavenAIChatbotProps> = ({
             ))}
           </AnimatePresence>
           
-          {/* Loading Indicator */}
+          {/* Loading Indicator with AI Council Visualization */}
           {isLoading && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              className="flex items-center gap-3 px-4 py-3"
+              className="space-y-3"
             >
-              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gold-400 to-amber-600 flex items-center justify-center">
-                <Loader2 className="w-4 h-4 text-raven-900 animate-spin" />
-              </div>
-              <div className="flex items-center gap-1">
-                <span className="text-sm text-silver-400">Consulting AI Council</span>
-                <motion.span
-                  animate={{ opacity: [1, 0.3, 1] }}
-                  transition={{ duration: 1.5, repeat: Infinity }}
-                  className="text-gold-400"
-                >
-                  ...
-                </motion.span>
-              </div>
+              {/* AI Council Visualization (demo mode) */}
+              {isDemoMode && showCouncilViz && (
+                <AICouncilVisualization
+                  isActive={isLoading}
+                  compact={true}
+                  onComplete={() => setShowCouncilViz(false)}
+                />
+              )}
+              
+              {/* Simple loading indicator */}
+              {!showCouncilViz && (
+                <div className="flex items-center gap-3 px-4 py-3">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-gold-400 to-amber-600 flex items-center justify-center">
+                    <Loader2 className="w-4 h-4 text-raven-900 animate-spin" />
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <span className="text-sm text-silver-400">Consulting AI Council</span>
+                    <motion.span
+                      animate={{ opacity: [1, 0.3, 1] }}
+                      transition={{ duration: 1.5, repeat: Infinity }}
+                      className="text-gold-400"
+                    >
+                      ...
+                    </motion.span>
+                  </div>
+                </div>
+              )}
+              
+              {/* Inline council indicator for non-demo mode */}
+              {!isDemoMode && (
+                <CouncilThinkingIndicator isActive={isLoading} className="px-4" />
+              )}
             </motion.div>
           )}
           
@@ -450,9 +555,34 @@ export const RavenAIChatbot: React.FC<RavenAIChatbotProps> = ({
         </div>
       )}
       
+      {/* Demo Soft Prompt (after 3 messages) */}
+      {isDemoMode && showWalletPrompt && !dismissedSoftPrompt && !isMinimized && messagesRemaining > 0 && (
+        <div className="relative z-10 px-4 py-2">
+          <DemoSoftPrompt
+            onConnect={handleConnectWallet}
+            onDismiss={() => setDismissedSoftPrompt(true)}
+            messagesRemaining={messagesRemaining}
+          />
+        </div>
+      )}
+      
+      {/* Voice Status Indicators */}
+      {!isMinimized && (isPlaying || isListening) && (
+        <div className="relative z-10 px-4 py-2 flex justify-center">
+          <AnimatePresence mode="wait">
+            {isPlaying && (
+              <SpeakingIndicator isActive={isPlaying} onStop={stopPlayback} />
+            )}
+            {isListening && !isPlaying && (
+              <ListeningIndicator isActive={isListening} />
+            )}
+          </AnimatePresence>
+        </div>
+      )}
+      
       {/* Input Area */}
       {!isMinimized && (
-        <div className="p-3 bg-raven-900 border-t border-gold-500/20">
+        <div className="relative z-10 p-3 bg-raven-900 border-t border-gold-500/20">
           <div className="flex items-end gap-2">
             {/* Speech-to-Text Button */}
             <button
@@ -515,36 +645,70 @@ export const RavenAIChatbot: React.FC<RavenAIChatbotProps> = ({
   // Floating chat window - Mobile responsive, solid background
   if (floating) {
     return (
-      <AnimatePresence>
-        {isOpen && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
-            transition={{ duration: 0.2 }}
-            className={`fixed z-[9999] ${
-              isMinimized 
-                ? 'bottom-4 right-4 sm:bottom-6 sm:right-6 w-[280px] sm:w-[320px] h-14' 
-                : 'inset-2 sm:inset-auto sm:bottom-6 sm:right-6 sm:w-[400px] sm:h-[600px]'
-            } rounded-2xl shadow-[0_0_40px_rgba(0,0,0,0.8)] border-2 border-gold-500/50 overflow-hidden ${className}`}
-            style={{ 
-              maxHeight: isMinimized ? '56px' : 'calc(100vh - 16px)',
-              maxWidth: isMinimized ? 'auto' : 'calc(100vw - 16px)',
-              backgroundColor: '#0a0a0a', // Solid dark background
-            }}
-          >
-            {chatContent}
-          </motion.div>
+      <>
+        <AnimatePresence>
+          {isOpen && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              transition={{ duration: 0.2 }}
+              className={`fixed z-[9999] ${
+                isMinimized 
+                  ? 'bottom-4 right-4 sm:bottom-6 sm:right-6 w-[280px] sm:w-[320px] h-14' 
+                  : 'inset-2 sm:inset-auto sm:bottom-6 sm:right-6 sm:w-[400px] sm:h-[600px]'
+              } rounded-2xl shadow-[0_0_40px_rgba(0,0,0,0.8)] border-2 border-gold-500/50 overflow-hidden ${className}`}
+              style={{ 
+                maxHeight: isMinimized ? '56px' : 'calc(100vh - 16px)',
+                maxWidth: isMinimized ? 'auto' : 'calc(100vw - 16px)',
+                backgroundColor: '#0a0a0a', // Solid dark background
+              }}
+            >
+              {chatContent}
+            </motion.div>
+          )}
+        </AnimatePresence>
+        
+        {/* Demo Rate Limit Modal */}
+        {isRateLimitModalOpen && (
+          <DemoRateLimitModal
+            onClose={hideRateLimitModal}
+            onConnectWallet={handleConnectWallet}
+          />
         )}
-      </AnimatePresence>
+        
+        {/* Ecosystem Showcase */}
+        <EcosystemShowcase
+          isOpen={isEcosystemShowcaseOpen}
+          onClose={hideEcosystemShowcase}
+          onNavigate={handleEcosystemNavigate}
+        />
+      </>
     );
   }
   
   // Inline chat
   return (
-    <div className={`w-full h-full bg-raven-950 rounded-2xl border border-gold-500/30 overflow-hidden ${className}`}>
-      {chatContent}
-    </div>
+    <>
+      <div className={`w-full h-full bg-raven-950 rounded-2xl border border-gold-500/30 overflow-hidden ${className}`}>
+        {chatContent}
+      </div>
+      
+      {/* Demo Rate Limit Modal */}
+      {isRateLimitModalOpen && (
+        <DemoRateLimitModal
+          onClose={hideRateLimitModal}
+          onConnectWallet={handleConnectWallet}
+        />
+      )}
+      
+      {/* Ecosystem Showcase */}
+      <EcosystemShowcase
+        isOpen={isEcosystemShowcaseOpen}
+        onClose={hideEcosystemShowcase}
+        onNavigate={handleEcosystemNavigate}
+      />
+    </>
   );
 };
 
