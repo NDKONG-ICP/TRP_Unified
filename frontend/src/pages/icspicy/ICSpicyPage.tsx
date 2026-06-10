@@ -2,7 +2,7 @@
  * IC SPICY RWA Co-op Page
  * Flagship Real World Asset (RWA) platform for pepper farming co-op
  * Features: SpicyAI Assistant, Shop, Menu, Live Inventory Control
- * Original site: https://vmcfj-haaaa-aaaao-a4o3q-cai.icp0.io
+ * Original site: https://www.icspicy.app
  */
 
 import React, { useState, useEffect } from 'react';
@@ -45,7 +45,7 @@ import icSpicyLogo from '../../icspicylogo.PNG';
 import spicyBanner from '../../spicy_banner.svg';
 
 const T3KNO_SHOP = 'https://t3kno.shop';
-const IC_SPICY_SITE = 'https://vmcfj-haaaa-aaaao-a4o3q-cai.icp0.io';
+const IC_SPICY_SITE = 'https://www.icspicy.app';
 
 type MenuItem = {
   id: string;
