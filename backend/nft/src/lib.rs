@@ -123,7 +123,7 @@ impl Default for CollectionConfig {
             name: "IC Spicy Collection".to_string(),
             symbol: "SPICY".to_string(),
             description: "Generative NFT collection with RWA backing".to_string(),
-            max_supply: 1000,
+            max_supply: 300,
             minted: 0,
             royalty_bps: 500, // 5%
             admin: Principal::anonymous(),
@@ -314,7 +314,16 @@ fn init() {
 fn pre_upgrade() {}
 
 #[post_upgrade]
-fn post_upgrade() {}
+fn post_upgrade() {
+    // Safe while minted == 0: align live cap with advertised 300 exclusive supply.
+    CONFIG.with(|c| {
+        let mut config = c.borrow().get().clone();
+        if config.minted == 0 && config.max_supply != 300 {
+            config.max_supply = 300;
+            let _ = c.borrow_mut().set(config);
+        }
+    });
+}
 
 // === ICRC-7 Standard Methods ===
 
@@ -780,8 +789,9 @@ fn remove_admin_principal(principal: Principal) -> Result<(), String> {
         return Err("Only admin can remove admin principals".to_string());
     }
     
-    // Prevent removing the primary admin
-    if principal.to_text() == ADMIN_PRINCIPAL {
+    // Prevent removing the primary admin (stored in collection config at init)
+    let primary_admin = CONFIG.with(|c| c.borrow().get().admin);
+    if principal == primary_admin {
         return Err("Cannot remove primary admin".to_string());
     }
     
